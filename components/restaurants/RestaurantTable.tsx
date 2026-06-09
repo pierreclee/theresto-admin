@@ -26,7 +26,7 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
                 : status === 'pending'
                   ? 'warning'
                   : 'error';
-            return <Badge label={String(status).toUpperCase()} variant={variant as any} />;
+            return <Badge label={String(status).toUpperCase()} variant={variant} />;
           },
         },
         {

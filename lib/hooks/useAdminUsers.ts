@@ -1,15 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-
-export interface AdminUser {
-  uid: string;
-  email: string;
-  role: 'super_admin' | 'admin' | 'read_only';
-  mfaEnrolled: boolean;
-  addedBy?: string;
-  addedAt: Date;
-}
+import { AdminUser } from '@/lib/types/admin';
 
 export function useAdminUsers() {
   return useQuery({

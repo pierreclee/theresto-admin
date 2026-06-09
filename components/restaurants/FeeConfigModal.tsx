@@ -15,16 +15,22 @@ export function FeeConfigModal({ isOpen, onClose, restaurantId, currentFee }: Fe
   const [fee, setFee] = useState(currentFee);
   const { mutate, isPending, error } = useSetAdminFee();
 
+  const EXAMPLE_REVENUE = 1000;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const clampedFee = Math.min(30, Math.max(0, fee));
+    if (clampedFee !== fee) {
+      setFee(clampedFee);
+      return;
+    }
     mutate(
       { restaurantId, feePercent: fee },
       { onSuccess: () => onClose() },
     );
   };
 
-  const estimatedRevenue = 1000;
-  const estimatedCommission = (estimatedRevenue * fee) / 100;
+  const estimatedCommission = (EXAMPLE_REVENUE * fee) / 100;
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Modifier la commission" size="md">
@@ -48,7 +54,7 @@ export function FeeConfigModal({ isOpen, onClose, restaurantId, currentFee }: Fe
         <div className="bg-blue-50 p-4 rounded-lg">
           <p className="text-sm text-gray-600">Exemple de calcul</p>
           <p className="text-sm font-semibold mt-2">
-            Sur €{estimatedRevenue.toFixed(2)} de CA, TheResto percevrait €{estimatedCommission.toFixed(2)}
+            Sur €{EXAMPLE_REVENUE.toFixed(2)} de CA, TheResto percevrait €{estimatedCommission.toFixed(2)}
           </p>
         </div>
 

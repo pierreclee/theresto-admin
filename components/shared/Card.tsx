@@ -13,6 +13,9 @@ export function Card({ children, className = '', onClick }: CardProps) {
         onClick ? 'cursor-pointer' : ''
       } ${className}`}
       onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); } : undefined}
     >
       {children}
     </div>
