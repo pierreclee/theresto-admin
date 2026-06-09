@@ -4,28 +4,31 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/lib/hooks/useAuth';
+import { MultiFactorResolver } from 'firebase/auth';
+import { verifyTOTPCode } from '@/lib/mfa/utils';
 
 export default function MFAChallengePage() {
   const router = useRouter();
-  const { user, hasMfa, loading } = useAuth();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
 
+  // Retrieve MFA resolver from previous login attempt
   useEffect(() => {
-    if (loading) return;
+    if (typeof window !== 'undefined') {
+      const storedResolver = (window as any).__mfaResolver;
+      const storedEmail = (window as any).__mfaEmail;
 
-    if (!user) {
-      router.push('/auth/login');
-      return;
-    }
+      if (!storedResolver) {
+        // No MFA in progress, redirect to login
+        router.push('/auth/login');
+        return;
+      }
 
-    if (!hasMfa) {
-      router.push('/auth/mfa-enrollment');
-      return;
+      setResolver(storedResolver);
     }
-  }, [user, hasMfa, loading, router]);
+  }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,28 +36,55 @@ export default function MFAChallengePage() {
     setVerifying(true);
 
     try {
+      if (!resolver) {
+        setError('Session MFA expirée, veuillez vous reconnecter');
+        setVerifying(false);
+        return;
+      }
+
       if (!code || code.length !== 6) {
         setError('Code invalide (6 chiffres requis)');
         setVerifying(false);
         return;
       }
 
-      // TODO: Call Cloud Function to verify MFA code
-      // For now, just set session start time and redirect
+      // Verify TOTP code and complete sign-in
+      const userCredential = await verifyTOTPCode(resolver, code);
+
+      // Verify admin claim
+      const idTokenResult = await userCredential.user.getIdTokenResult();
+      if (idTokenResult.claims.admin !== true) {
+        setError('Accès administrateur requis');
+        setVerifying(false);
+        return;
+      }
+
+      // MFA verified, start session
       localStorage.setItem('adminSessionStart', Date.now().toString());
+
+      // Clean up
+      if (typeof window !== 'undefined') {
+        delete (window as any).__mfaResolver;
+        delete (window as any).__mfaEmail;
+      }
+
       router.push('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur de vérification MFA');
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('Erreur de vérification MFA');
+      }
       setVerifying(false);
     }
   };
 
-  if (loading) {
+  if (!resolver) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-700">Chargement...</p>
+          <p className="mt-4 text-gray-700">Chargement de la vérification MFA...</p>
         </div>
       </div>
     );

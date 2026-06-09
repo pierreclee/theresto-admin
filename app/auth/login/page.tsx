@@ -4,9 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, MultiFactorError } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LoginFormSchema } from '@/lib/utils/validators';
+import { isMFAError, type MFASession } from '@/lib/mfa/utils';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,25 +23,53 @@ export default function LoginPage() {
 
     try {
       const validated = LoginFormSchema.parse({ email, password });
-      const result = await signInWithEmailAndPassword(auth, validated.email, validated.password);
-      const idTokenResult = await result.user.getIdTokenResult();
 
-      if (idTokenResult.claims.admin !== true) {
-        setError('Accès administrateur requis');
-        setLoading(false);
-        return;
-      }
+      try {
+        // Try to sign in
+        const result = await signInWithEmailAndPassword(
+          auth,
+          validated.email,
+          validated.password
+        );
 
-      if (idTokenResult.claims.mfaEnrolled !== true) {
-        router.push('/auth/mfa-enrollment');
-      } else {
-        router.push('/auth/mfa-challenge');
+        const idTokenResult = await result.user.getIdTokenResult();
+
+        if (idTokenResult.claims.admin !== true) {
+          setError('Accès administrateur requis');
+          setLoading(false);
+          return;
+        }
+
+        // Successfully authenticated, no MFA required
+        localStorage.setItem('adminSessionStart', Date.now().toString());
+        router.push('/');
+      } catch (signInError: any) {
+        // Check if MFA is required
+        if (isMFAError(signInError)) {
+          const mfaError = signInError as MultiFactorError;
+
+          // Store MFA session for the challenge page
+          if (typeof window !== 'undefined') {
+            (window as any).__mfaResolver = mfaError.resolver;
+            (window as any).__mfaEmail = validated.email;
+          }
+
+          router.push('/auth/mfa-challenge');
+        } else {
+          // Regular sign-in error
+          if (signInError instanceof Error) {
+            setError(signInError.message);
+          } else {
+            setError('Erreur de connexion');
+          }
+          setLoading(false);
+        }
       }
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
       } else {
-        setError('Erreur de connexion');
+        setError('Erreur de validation');
       }
       setLoading(false);
     }
@@ -60,6 +89,7 @@ export default function LoginPage() {
             <input
               type="email"
               id="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -76,6 +106,7 @@ export default function LoginPage() {
             <input
               type="password"
               id="password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
