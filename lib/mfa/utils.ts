@@ -13,6 +13,15 @@ export function isMFAError(error: any): error is MultiFactorError {
   return error.code === 'auth/multi-factor-auth-required';
 }
 
+export async function generateTOTPSecret() {
+  // This would be implemented in Cloud Functions for security
+  // For MVP, we return a placeholder that will be handled server-side
+  return {
+    secret: 'TOTP_SECRET_PLACEHOLDER',
+    qrCodeUrl: 'data:image/svg+xml,<svg></svg>',
+  };
+}
+
 export async function verifyTOTPCode(
   resolver: MultiFactorResolver,
   code: string
@@ -30,10 +39,10 @@ export async function verifyTOTPCode(
     }
 
     // Create assertion from code
-    const assertion = await TotpMultiFactorGenerator.assertionFromSecret(
-      totpFactor.uid,
-      code
-    );
+    // Use assertionForSignIn for sign-in verification (not enrollment)
+    const assertion = await (
+      TotpMultiFactorGenerator as any
+    ).assertionForSignIn(totpFactor.uid, code);
 
     // Resolve sign-in
     const userCredential = await resolver.resolveSignIn(assertion);

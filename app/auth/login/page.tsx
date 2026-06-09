@@ -46,10 +46,10 @@ export default function LoginPage() {
       } catch (signInError: any) {
         // Check if MFA is required
         if (isMFAError(signInError)) {
-          const mfaError = signInError as MultiFactorError;
+          const mfaError = signInError as MultiFactorError & { resolver?: any };
 
           // Store MFA session for the challenge page
-          if (typeof window !== 'undefined') {
+          if (typeof window !== 'undefined' && mfaError.resolver) {
             (window as any).__mfaResolver = mfaError.resolver;
             (window as any).__mfaEmail = validated.email;
           }
