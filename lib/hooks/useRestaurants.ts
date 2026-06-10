@@ -60,6 +60,7 @@ export function useApproveRestaurant() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['platformStats'] });
     },
   });
 }
@@ -77,6 +78,7 @@ export function useUpdateSubscription() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ['platformStats'] });
     },
   });
 }
