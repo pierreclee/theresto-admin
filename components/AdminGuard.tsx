@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 
@@ -12,12 +12,17 @@ const PUBLIC_ROUTES = [
 ];
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const { user, isAdmin, hasMfa, sessionValid, loading } = useAuth();
 
   useEffect(() => {
-    if (loading) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || loading) return;
 
     const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
 
@@ -35,8 +40,8 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // If user hasn't enrolled MFA, redirect to enrollment (unless already there)
-    if (!hasMfa && pathname !== '/auth/mfa-enrollment') {
+    // If user hasn't enrolled MFA, redirect to enrollment (unless already there or on challenge)
+    if (!hasMfa && pathname !== '/auth/mfa-enrollment' && pathname !== '/auth/mfa-challenge') {
       router.push('/auth/mfa-enrollment');
       return;
     }
@@ -51,9 +56,9 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
     if (isPublicRoute && user && isAdmin && hasMfa && sessionValid) {
       router.push('/');
     }
-  }, [user, isAdmin, hasMfa, sessionValid, loading, pathname, router]);
+  }, [mounted, user, isAdmin, hasMfa, sessionValid, loading, pathname, router]);
 
-  if (loading) {
+  if (!mounted || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-50">
         <div className="text-center">

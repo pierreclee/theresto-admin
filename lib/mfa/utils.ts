@@ -2,6 +2,9 @@ import {
   MultiFactorResolver,
   MultiFactorError,
   TotpMultiFactorGenerator,
+  TotpSecret,
+  multiFactor,
+  User,
 } from 'firebase/auth';
 
 export interface MFASession {
@@ -9,17 +12,33 @@ export interface MFASession {
   email: string;
 }
 
+export interface TOTPSetup {
+  secret: TotpSecret;
+  qrCodeUrl: string;
+}
+
 export function isMFAError(error: any): error is MultiFactorError {
   return error.code === 'auth/multi-factor-auth-required';
 }
 
-export async function generateTOTPSecret() {
-  // This would be implemented in Cloud Functions for security
-  // For MVP, we return a placeholder that will be handled server-side
-  return {
-    secret: 'TOTP_SECRET_PLACEHOLDER',
-    qrCodeUrl: 'data:image/svg+xml,<svg></svg>',
-  };
+export async function generateTOTPSecret(user: User): Promise<TOTPSetup> {
+  const multiFactorUser = multiFactor(user);
+  const session = await multiFactorUser.getSession();
+  const secret = await TotpMultiFactorGenerator.generateSecret(session);
+  const qrCodeUrl = secret.generateQrCodeUrl(
+    user.email || 'admin',
+    'TheResto Admin'
+  );
+  return { secret, qrCodeUrl };
+}
+
+export async function enrollTOTP(
+  user: User,
+  secret: TotpSecret,
+  code: string
+): Promise<void> {
+  const assertion = TotpMultiFactorGenerator.assertionForEnrollment(secret, code);
+  await multiFactor(user).enroll(assertion, 'TheResto Admin TOTP');
 }
 
 export async function verifyTOTPCode(
@@ -39,7 +58,6 @@ export async function verifyTOTPCode(
     }
 
     // Create assertion from code
-    // Use assertionForSignIn for sign-in verification (not enrollment)
     const assertion = await (
       TotpMultiFactorGenerator as any
     ).assertionForSignIn(totpFactor.uid, code);
