@@ -15,8 +15,10 @@ export default function RootLayoutClient({
       <AdminGuard>
         <Sidebar />
         <Header />
-        <main className="ml-64 mt-16 p-6 bg-gray-50 min-h-screen">
-          {children}
+        <main className="ml-64 pt-14 min-h-screen bg-gray-50">
+          <div className="p-6 max-w-7xl">
+            {children}
+          </div>
         </main>
       </AdminGuard>
     </Providers>

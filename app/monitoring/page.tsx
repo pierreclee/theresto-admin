@@ -1,20 +1,23 @@
 'use client';
 
 import { AuditLogsViewer } from '@/components/monitoring/AuditLogsViewer';
-import { Card } from '@/components/shared/Card';
 
 export default function MonitoringPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">Monitoring</h1>
-        <p className="text-gray-600 mt-2">Consultez les logs d'administration et l'audit des actions</p>
+        <h2 className="text-xl font-bold text-gray-900">Monitoring</h2>
+        <p className="text-sm text-gray-500 mt-0.5">Journaux d&apos;audit et traçabilité des actions admin</p>
       </div>
 
-      <Card>
-        <h2 className="text-xl font-semibold mb-6">Journaux d'audit</h2>
-        <AuditLogsViewer />
-      </Card>
+      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-50">
+          <h3 className="text-sm font-semibold text-gray-900">Journaux d&apos;audit</h3>
+        </div>
+        <div className="p-5">
+          <AuditLogsViewer />
+        </div>
+      </div>
     </div>
   );
 }
