@@ -44,3 +44,39 @@ export function useSetAdminFee() {
     },
   });
 }
+
+export function useApproveRestaurant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      restaurantId,
+      status,
+      reason,
+    }: {
+      restaurantId: string;
+      status: 'approved' | 'rejected' | 'suspended';
+      reason?: string;
+    }) => adminApi.approveRestaurant(restaurantId, status, reason),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
+    },
+  });
+}
+
+export function useUpdateSubscription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      restaurantId,
+      plan,
+    }: {
+      restaurantId: string;
+      plan: 'free' | 'premium';
+    }) => adminApi.updateSubscriptionPlan(restaurantId, plan),
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
+    },
+  });
+}

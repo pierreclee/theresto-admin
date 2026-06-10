@@ -64,6 +64,33 @@ export const adminApi = {
     }
   },
 
+  approveRestaurant: async (
+    restaurantId: string,
+    status: 'approved' | 'rejected' | 'suspended',
+    reason?: string
+  ): Promise<{ success: boolean }> => {
+    try {
+      const fn = httpsCallable(functions, 'approveRestaurant');
+      await fn({ restaurantId, status, reason: reason ?? null });
+      return { success: true };
+    } catch (error) {
+      throw parseFirebaseError(error);
+    }
+  },
+
+  updateSubscriptionPlan: async (
+    restaurantId: string,
+    plan: 'free' | 'premium'
+  ): Promise<{ success: boolean }> => {
+    try {
+      const fn = httpsCallable(functions, 'updateSubscriptionPlan');
+      await fn({ restaurantId, plan });
+      return { success: true };
+    } catch (error) {
+      throw parseFirebaseError(error);
+    }
+  },
+
   getAuditLogs: async (filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> => {
     try {
       const fn = httpsCallable(functions, 'getAuditLogs');
