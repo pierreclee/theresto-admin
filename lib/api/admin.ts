@@ -1,7 +1,10 @@
 import { httpsCallable } from 'firebase/functions';
-import { functions } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { functions, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import type { Restaurant, UpdateRestaurantInput } from '@/lib/types/restaurant';
 import type { AuditLog, AuditLogFilter, PlatformStats } from '@/lib/types/audit';
+import type { PlatformConfig, UpdatePlatformConfigInput } from '@/lib/types/config';
 import { parseFirebaseError } from '@/lib/utils/errors';
 
 export const adminApi = {
@@ -66,6 +69,48 @@ export const adminApi = {
       const fn = httpsCallable(functions, 'getAuditLogs');
       const result = await fn(filters);
       return result.data as { logs: AuditLog[]; total: number };
+    } catch (error) {
+      throw parseFirebaseError(error);
+    }
+  },
+
+  getConfig: async (): Promise<PlatformConfig> => {
+    try {
+      const snap = await getDoc(doc(db, 'appConfig', 'global'));
+      const data = snap.data() ?? {};
+      return {
+        commissionRate: (data.commissionRate as number) ?? 5,
+        currency: (data.currency as string) ?? 'EUR',
+        maintenanceMode: (data.maintenanceMode as boolean) ?? false,
+        updatedAt: data.updatedAt?.toDate?.() ?? undefined,
+        updatedBy: (data.updatedBy as string) ?? undefined,
+      };
+    } catch (error) {
+      throw parseFirebaseError(error);
+    }
+  },
+
+  updateConfig: async (updates: UpdatePlatformConfigInput): Promise<PlatformConfig> => {
+    try {
+      const ref = doc(db, 'appConfig', 'global');
+      await setDoc(
+        ref,
+        {
+          ...updates,
+          updatedAt: serverTimestamp(),
+          updatedBy: auth.currentUser?.email ?? auth.currentUser?.uid ?? 'unknown',
+        },
+        { merge: true }
+      );
+      const snap = await getDoc(ref);
+      const data = snap.data() ?? {};
+      return {
+        commissionRate: (data.commissionRate as number) ?? 5,
+        currency: (data.currency as string) ?? 'EUR',
+        maintenanceMode: (data.maintenanceMode as boolean) ?? false,
+        updatedAt: data.updatedAt?.toDate?.() ?? undefined,
+        updatedBy: (data.updatedBy as string) ?? undefined,
+      };
     } catch (error) {
       throw parseFirebaseError(error);
     }
