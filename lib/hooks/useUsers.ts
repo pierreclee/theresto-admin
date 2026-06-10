@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@/lib/api/users';
+import { useToast } from '@/components/shared/Toaster';
 import type { ModerationAction } from '@/lib/types/user';
 
 export function useUsers(filters: { roleFilter?: string; statusFilter?: string }) {
@@ -54,6 +55,7 @@ export function useUserCrmProfile(userId: string | null) {
 }
 
 export function useModerateUser() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -68,6 +70,8 @@ export function useModerateUser() {
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['userCrm', vars.userId] });
+      toast('Compte utilisateur mis à jour');
     },
+    onError: () => toast('Erreur lors de la modération', 'error'),
   });
 }

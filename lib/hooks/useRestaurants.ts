@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
+import { useToast } from '@/components/shared/Toaster';
 import type { UpdateRestaurantInput } from '@/lib/types/restaurant';
 
 export function useRestaurants(filters?: { status?: string; subscription?: string; search?: string }) {
@@ -23,6 +24,7 @@ export function useRestaurantDetail(restaurantId: string) {
 }
 
 export function useUpdateRestaurant() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ restaurantId, updates }: { restaurantId: string; updates: UpdateRestaurantInput }) =>
@@ -30,22 +32,28 @@ export function useUpdateRestaurant() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.setQueryData(['restaurant', data.id], data);
+      toast('Restaurant mis à jour');
     },
+    onError: () => toast('Erreur lors de la mise à jour', 'error'),
   });
 }
 
 export function useSetAdminFee() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ restaurantId, feePercent }: { restaurantId: string; feePercent: number }) =>
       adminApi.setAdminFee(restaurantId, feePercent),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
+      toast('Commission mise à jour');
     },
+    onError: () => toast('Erreur lors de la mise à jour', 'error'),
   });
 }
 
 export function useApproveRestaurant() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -61,11 +69,14 @@ export function useApproveRestaurant() {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['platformStats'] });
+      toast('Statut du restaurant mis à jour');
     },
+    onError: () => toast('Erreur lors de la mise à jour du statut', 'error'),
   });
 }
 
 export function useUpdateSubscription() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -79,6 +90,8 @@ export function useUpdateSubscription() {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['platformStats'] });
+      toast('Abonnement mis à jour');
     },
+    onError: () => toast('Erreur lors de la mise à jour de l\'abonnement', 'error'),
   });
 }

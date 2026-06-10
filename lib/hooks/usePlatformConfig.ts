@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
+import { useToast } from '@/components/shared/Toaster';
 import type { UpdatePlatformConfigInput } from '@/lib/types/config';
 
 export function usePlatformConfig() {
@@ -14,11 +15,14 @@ export function usePlatformConfig() {
 }
 
 export function useUpdatePlatformConfig() {
+  const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (updates: UpdatePlatformConfigInput) => adminApi.updateConfig(updates),
     onSuccess: (data) => {
       queryClient.setQueryData(['platformConfig'], data);
+      toast('Configuration mise à jour');
     },
+    onError: () => toast('Erreur lors de la mise à jour', 'error'),
   });
 }
