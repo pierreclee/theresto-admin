@@ -7,7 +7,7 @@ import { parseFirebaseError } from '@/lib/utils/errors';
 export const adminApi = {
   getStats: async (): Promise<PlatformStats> => {
     try {
-      const fn = httpsCallable(functions, 'getAdminStats');
+      const fn = httpsCallable(functions, 'getPlatformStats');
       const result = await fn({});
       return result.data as PlatformStats;
     } catch (error) {
@@ -53,8 +53,8 @@ export const adminApi = {
 
   setAdminFee: async (restaurantId: string, feePercent: number): Promise<{ success: boolean }> => {
     try {
-      const fn = httpsCallable(functions, 'setAdminFee');
-      await fn({ restaurantId, feePercent });
+      const fn = httpsCallable(functions, 'updateRestaurantCommission');
+      await fn({ restaurantId, commissionRate: feePercent });
       return { success: true };
     } catch (error) {
       throw parseFirebaseError(error);
