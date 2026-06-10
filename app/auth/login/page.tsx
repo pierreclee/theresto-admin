@@ -4,10 +4,11 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, MultiFactorError } from 'firebase/auth';
+import { signInWithEmailAndPassword, getMultiFactorResolver } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { LoginFormSchema } from '@/lib/utils/validators';
 import { isMFAError, type MFASession } from '@/lib/mfa/utils';
+import { storeMfaResolver } from '@/lib/mfa/resolver-store';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,7 +33,7 @@ export default function LoginPage() {
           validated.password
         );
 
-        const idTokenResult = await result.user.getIdTokenResult();
+        const idTokenResult = await result.user.getIdTokenResult(true);
 
         if (idTokenResult.claims.admin !== true) {
           setError('Accès administrateur requis');
@@ -44,23 +45,38 @@ export default function LoginPage() {
         localStorage.setItem('adminSessionStart', Date.now().toString());
         router.push('/');
       } catch (signInError: any) {
+        console.log('Sign-in error:', signInError);
+        console.log('Error code:', signInError.code);
+        console.log('Is MFA error?', isMFAError(signInError));
+
         // Check if MFA is required
         if (isMFAError(signInError)) {
-          const mfaError = signInError as MultiFactorError & { resolver?: any };
+          console.log('MFA required, redirecting...');
 
-          // Store MFA session for the challenge page
-          if (typeof window !== 'undefined' && mfaError.resolver) {
-            (window as any).__mfaResolver = mfaError.resolver;
-            (window as any).__mfaEmail = validated.email;
+          try {
+            // Get the resolver using Firebase's proper function
+            const resolver = getMultiFactorResolver(auth, signInError);
+            console.log('Resolver obtained:', !!resolver);
+
+            // Store MFA session for the challenge page
+            storeMfaResolver(resolver, validated.email);
+
+            console.log('MFA resolver stored, navigating to challenge...');
+            router.push('/auth/mfa-challenge');
+          } catch (resolverError) {
+            console.error('Failed to get MFA resolver:', resolverError);
+            setError('Erreur lors de la récupération du résolveur MFA');
+            setLoading(false);
           }
-
-          router.push('/auth/mfa-challenge');
         } else {
           // Regular sign-in error
+          console.log('Regular error, not MFA');
           if (signInError instanceof Error) {
             setError(signInError.message);
+            console.log('Error message:', signInError.message);
           } else {
             setError('Erreur de connexion');
+            console.log('Unknown error');
           }
           setLoading(false);
         }

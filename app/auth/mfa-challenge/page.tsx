@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { MultiFactorResolver } from 'firebase/auth';
 import { verifyTOTPCode } from '@/lib/mfa/utils';
+import { getMfaResolver, clearMfaResolver } from '@/lib/mfa/resolver-store';
 
 export default function MFAChallengePage() {
   const router = useRouter();
@@ -16,18 +17,14 @@ export default function MFAChallengePage() {
 
   // Retrieve MFA resolver from previous login attempt
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedResolver = (window as any).__mfaResolver;
-      const storedEmail = (window as any).__mfaEmail;
+    const { resolver: storedResolver } = getMfaResolver();
 
-      if (!storedResolver) {
-        // No MFA in progress, redirect to login
-        router.push('/auth/login');
-        return;
-      }
-
-      setResolver(storedResolver);
+    if (!storedResolver) {
+      router.push('/auth/login');
+      return;
     }
+
+    setResolver(storedResolver);
   }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,25 +45,31 @@ export default function MFAChallengePage() {
         return;
       }
 
-      // Verify TOTP code and complete sign-in
-      const userCredential = await verifyTOTPCode(resolver, code);
+      // Set mfaVerified before resolveSignIn so onAuthStateChanged reads it immediately
+      localStorage.setItem('mfaVerified', 'true');
+      localStorage.setItem('adminSessionStart', Date.now().toString());
+
+      let userCredential;
+      try {
+        userCredential = await verifyTOTPCode(resolver, code);
+      } catch (verifyErr) {
+        // Verification failed — clear optimistic flags
+        localStorage.removeItem('mfaVerified');
+        localStorage.removeItem('adminSessionStart');
+        throw verifyErr;
+      }
 
       // Verify admin claim
-      const idTokenResult = await userCredential.user.getIdTokenResult();
+      const idTokenResult = await userCredential.user.getIdTokenResult(true);
       if (idTokenResult.claims.admin !== true) {
+        localStorage.removeItem('mfaVerified');
+        localStorage.removeItem('adminSessionStart');
         setError('Accès administrateur requis');
         setVerifying(false);
         return;
       }
 
-      // MFA verified, start session
-      localStorage.setItem('adminSessionStart', Date.now().toString());
-
-      // Clean up
-      if (typeof window !== 'undefined') {
-        delete (window as any).__mfaResolver;
-        delete (window as any).__mfaEmail;
-      }
+      clearMfaResolver();
 
       router.push('/');
     } catch (err) {
