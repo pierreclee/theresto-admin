@@ -15,16 +15,13 @@ import {
   Clock,
   ShieldOff,
   Globe,
-  Instagram,
-  Facebook,
-  Tag,
-  UtensilsCrossed,
+  AtSign,
+  Link,
   AlertCircle,
   Pencil,
-  MapPinned,
+  LocateFixed,
   User,
   CalendarDays,
-  Image as ImageIcon,
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
 import { FeeConfigModal } from './FeeConfigModal';
@@ -281,7 +278,7 @@ export function RestaurantDetail({ restaurant }: Props) {
             )}
             {restaurant.contact?.instagram && (
               <InfoRow
-                icon={Instagram}
+                icon={AtSign}
                 label="Instagram"
                 value={restaurant.contact.instagram}
                 href={
@@ -293,7 +290,7 @@ export function RestaurantDetail({ restaurant }: Props) {
             )}
             {restaurant.contact?.facebook && (
               <InfoRow
-                icon={Facebook}
+                icon={Link}
                 label="Facebook"
                 value={restaurant.contact.facebook}
                 href={
@@ -312,10 +309,10 @@ export function RestaurantDetail({ restaurant }: Props) {
             <SectionHeader title="Localisation GPS" />
             <div className="px-5">
               {restaurant.latitude != null && (
-                <InfoRow icon={MapPinned} label="Latitude" value={String(restaurant.latitude)} mono />
+                <InfoRow icon={LocateFixed} label="Latitude" value={String(restaurant.latitude)} mono />
               )}
               {restaurant.longitude != null && (
-                <InfoRow icon={MapPinned} label="Longitude" value={String(restaurant.longitude)} mono />
+                <InfoRow icon={LocateFixed} label="Longitude" value={String(restaurant.longitude)} mono />
               )}
             </div>
           </div>
