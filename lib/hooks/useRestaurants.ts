@@ -60,11 +60,13 @@ export function useApproveRestaurant() {
       restaurantId,
       status,
       reason,
+      correctionMode,
     }: {
       restaurantId: string;
       status: 'approved' | 'rejected' | 'suspended';
       reason?: string;
-    }) => adminApi.approveRestaurant(restaurantId, status, reason),
+      correctionMode?: 'correction_required' | 'permanent';
+    }) => adminApi.approveRestaurant(restaurantId, status, reason, correctionMode),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });

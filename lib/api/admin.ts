@@ -67,11 +67,12 @@ export const adminApi = {
   approveRestaurant: async (
     restaurantId: string,
     status: 'approved' | 'rejected' | 'suspended',
-    reason?: string
+    reason?: string,
+    correctionMode?: 'correction_required' | 'permanent'
   ): Promise<{ success: boolean }> => {
     try {
       const fn = httpsCallable(functions, 'approveRestaurant');
-      await fn({ restaurantId, status, reason: reason ?? null });
+      await fn({ restaurantId, status, reason: reason ?? null, correctionMode: correctionMode ?? null });
       return { success: true };
     } catch (error) {
       throw parseFirebaseError(error);

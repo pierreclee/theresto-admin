@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CheckCircle2, XCircle, ShieldOff } from 'lucide-react';
+import { X, CheckCircle2, XCircle, ShieldOff, AlertTriangle, Ban } from 'lucide-react';
 import { useApproveRestaurant } from '@/lib/hooks/useRestaurants';
 
 type ApprovalStatus = 'approved' | 'rejected' | 'suspended';
+type CorrectionMode = 'correction_required' | 'permanent';
 
 const actions: {
   status: ApprovalStatus;
@@ -13,6 +14,7 @@ const actions: {
   icon: React.ElementType;
   color: string;
   requiresReason: boolean;
+  requiresCorrectionMode: boolean;
 }[] = [
   {
     status: 'approved',
@@ -21,6 +23,7 @@ const actions: {
     icon: CheckCircle2,
     color: 'text-green-600',
     requiresReason: false,
+    requiresCorrectionMode: false,
   },
   {
     status: 'rejected',
@@ -29,6 +32,7 @@ const actions: {
     icon: XCircle,
     color: 'text-red-600',
     requiresReason: true,
+    requiresCorrectionMode: true,
   },
   {
     status: 'suspended',
@@ -37,6 +41,27 @@ const actions: {
     icon: ShieldOff,
     color: 'text-orange-600',
     requiresReason: true,
+    requiresCorrectionMode: false,
+  },
+];
+
+const correctionModes: {
+  value: CorrectionMode;
+  label: string;
+  description: string;
+  icon: React.ElementType;
+}[] = [
+  {
+    value: 'correction_required',
+    label: 'Demande de correction',
+    description: 'Le restaurateur peut corriger les informations et soumettre à nouveau.',
+    icon: AlertTriangle,
+  },
+  {
+    value: 'permanent',
+    label: 'Refus définitif',
+    description: 'Le restaurant est définitivement refusé sur la plateforme.',
+    icon: Ban,
   },
 ];
 
@@ -50,6 +75,7 @@ interface Props {
 export function ApprovalModal({ restaurantId, restaurantName, currentStatus, onClose }: Props) {
   const availableActions = actions.filter((a) => a.status !== currentStatus);
   const [selected, setSelected] = useState<ApprovalStatus>(availableActions[0].status);
+  const [correctionMode, setCorrectionMode] = useState<CorrectionMode>('correction_required');
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const { mutateAsync, isPending } = useApproveRestaurant();
@@ -67,6 +93,7 @@ export function ApprovalModal({ restaurantId, restaurantName, currentStatus, onC
         restaurantId,
         status: selected,
         reason: currentAction.requiresReason ? reason.trim() : undefined,
+        correctionMode: selected === 'rejected' ? correctionMode : undefined,
       });
       onClose();
     } catch (e) {
@@ -91,6 +118,7 @@ export function ApprovalModal({ restaurantId, restaurantName, currentStatus, onC
             Restaurant : <span className="font-semibold text-gray-900">{restaurantName}</span>
           </p>
 
+          {/* Action principale */}
           <div className="space-y-1.5">
             {availableActions.map((a) => (
               <button
@@ -111,15 +139,56 @@ export function ApprovalModal({ restaurantId, restaurantName, currentStatus, onC
             ))}
           </div>
 
+          {/* Mode de rejet */}
+          {selected === 'rejected' && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-gray-600 uppercase tracking-wide">Type de refus</p>
+              {correctionModes.map((m) => (
+                <button
+                  key={m.value}
+                  onClick={() => setCorrectionMode(m.value)}
+                  className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
+                    correctionMode === m.value
+                      ? m.value === 'permanent'
+                        ? 'border-red-300 bg-red-50/50'
+                        : 'border-orange-300 bg-orange-50/50'
+                      : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                  }`}
+                >
+                  <m.icon
+                    size={15}
+                    className={`mt-0.5 flex-shrink-0 ${
+                      correctionMode === m.value
+                        ? m.value === 'permanent' ? 'text-red-600' : 'text-orange-600'
+                        : 'text-gray-400'
+                    }`}
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{m.label}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{m.description}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Raison */}
           {currentAction.requiresReason && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-gray-600 uppercase tracking-wide">
-                Raison <span className="text-red-500">*</span>
+                {selected === 'rejected' && correctionMode === 'correction_required'
+                  ? 'Informations à corriger'
+                  : 'Raison'}{' '}
+                <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="Expliquez la raison..."
+                placeholder={
+                  selected === 'rejected' && correctionMode === 'correction_required'
+                    ? 'Décrivez les informations à corriger ou compléter…'
+                    : 'Expliquez la raison…'
+                }
                 rows={3}
                 className="w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] resize-none"
               />
@@ -142,7 +211,11 @@ export function ApprovalModal({ restaurantId, restaurantName, currentStatus, onC
           <button
             onClick={handleConfirm}
             disabled={isPending}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#FF6B35] hover:bg-[#e55e2a] rounded-xl transition-colors disabled:opacity-50"
+            className={`flex-1 px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors disabled:opacity-50 ${
+              selected === 'rejected' && correctionMode === 'permanent'
+                ? 'bg-red-500 hover:bg-red-600'
+                : 'bg-[#FF6B35] hover:bg-[#e55e2a]'
+            }`}
           >
             {isPending ? 'Traitement…' : 'Confirmer'}
           </button>
