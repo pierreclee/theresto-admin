@@ -209,6 +209,7 @@ export function RestaurantDetail({ restaurant }: Props) {
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-gray-900">{restaurant.name}</h2>
+            <p className="text-xs font-mono text-gray-400 mt-0.5">{restaurant.id}</p>
               {restaurant.establishmentType && (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
                   {ESTABLISHMENT_LABELS[restaurant.establishmentType] ?? restaurant.establishmentType}
