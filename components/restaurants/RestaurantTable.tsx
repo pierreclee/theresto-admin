@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { Restaurant } from '@/lib/types/restaurant';
 import { Table } from '@/components/shared/Table';
+import { SubscriptionModal } from '@/components/restaurants/SubscriptionModal';
 
 const approvalLabel: Record<string, { label: string; className: string }> = {
   approved: { label: 'Approuvé', className: 'bg-green-50 text-green-700 border-green-100' },
@@ -31,32 +33,54 @@ interface RestaurantTableProps {
 }
 
 export function RestaurantTable({ restaurants, loading, onRowClick }: RestaurantTableProps) {
+  const [subscriptionTarget, setSubscriptionTarget] = useState<Restaurant | null>(null);
+
   return (
-    <Table<Restaurant>
-      columns={[
-        { key: 'name', label: 'Restaurant', width: 'w-1/4' },
-        { key: 'email', label: 'Email', width: 'w-1/4' },
-        {
-          key: 'approvalStatus',
-          label: 'Statut',
-          render: (v) => <StatusBadge value={String(v)} map={approvalLabel} />,
-        },
-        {
-          key: 'subscriptionPlan',
-          label: 'Plan',
-          render: (v) => <StatusBadge value={String(v)} map={planLabel} />,
-        },
-        {
-          key: 'monthlyRevenue',
-          label: 'Revenu (MTD)',
-          render: (v) =>
-            ((v as number) || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }),
-        },
-      ]}
-      data={restaurants}
-      keyField="id"
-      loading={loading}
-      onRowClick={onRowClick}
-    />
+    <>
+      <Table<Restaurant>
+        columns={[
+          { key: 'name', label: 'Restaurant', width: 'w-1/4' },
+          { key: 'email', label: 'Email', width: 'w-1/4' },
+          {
+            key: 'approvalStatus',
+            label: 'Statut',
+            render: (v) => <StatusBadge value={String(v)} map={approvalLabel} />,
+          },
+          {
+            key: 'subscriptionPlan',
+            label: 'Plan',
+            render: (v, row) => (
+              <button
+                onClick={(e) => { e.stopPropagation(); setSubscriptionTarget(row); }}
+                className="group/plan inline-flex items-center gap-1"
+                title="Modifier l'abonnement"
+              >
+                <StatusBadge value={String(v)} map={planLabel} />
+                <span className="text-xs text-gray-300 group-hover/plan:text-gray-500 transition-colors">✎</span>
+              </button>
+            ),
+          },
+          {
+            key: 'monthlyRevenue',
+            label: 'Revenu (MTD)',
+            render: (v) =>
+              ((v as number) || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }),
+          },
+        ]}
+        data={restaurants}
+        keyField="id"
+        loading={loading}
+        onRowClick={onRowClick}
+      />
+
+      {subscriptionTarget && (
+        <SubscriptionModal
+          restaurantId={subscriptionTarget.id}
+          restaurantName={subscriptionTarget.name}
+          currentPlan={subscriptionTarget.subscriptionPlan}
+          onClose={() => setSubscriptionTarget(null)}
+        />
+      )}
+    </>
   );
 }
