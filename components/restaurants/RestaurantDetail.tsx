@@ -434,8 +434,10 @@ export function RestaurantDetail({ restaurant }: Props) {
               label="Abonnement"
               sublabel={
                 restaurant.subscriptionPlan === 'premium'
-                  ? 'Premium ★ — cliquer pour rétrograder'
-                  : 'Free — cliquer pour activer Premium'
+                  ? 'Premium ★ — cliquer pour modifier'
+                  : restaurant.subscriptionPlan === 'liberte'
+                  ? 'Liberté — cliquer pour modifier'
+                  : 'Free — cliquer pour modifier'
               }
               onClick={() => setModal('subscription')}
               accent={restaurant.subscriptionPlan === 'premium'}

@@ -86,7 +86,7 @@ export function useUpdateSubscription() {
       plan,
     }: {
       restaurantId: string;
-      plan: 'free' | 'premium';
+      plan: 'free' | 'liberte' | 'premium';
     }) => adminApi.updateSubscriptionPlan(restaurantId, plan),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });

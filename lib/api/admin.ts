@@ -81,7 +81,7 @@ export const adminApi = {
 
   updateSubscriptionPlan: async (
     restaurantId: string,
-    plan: 'free' | 'premium'
+    plan: 'free' | 'liberte' | 'premium'
   ): Promise<{ success: boolean }> => {
     try {
       const fn = httpsCallable(functions, 'updateSubscriptionPlan');

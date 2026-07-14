@@ -28,7 +28,7 @@ export interface Restaurant {
   rejectionReason?: string | null;
   rejectedAt?: string | null;
   approvalStatus: 'pending' | 'approved' | 'rejected' | 'suspended';
-  subscriptionPlan: 'free' | 'premium';
+  subscriptionPlan: 'free' | 'liberte' | 'premium';
   isMollieConnected: boolean;
   commissionRate: number;
   totalRevenue?: number | null;
