@@ -4,21 +4,24 @@ import { useState } from 'react';
 import { X, Check } from 'lucide-react';
 import { useUpdateSubscription } from '@/lib/hooks/useRestaurants';
 
-type Plan = 'free' | 'liberte' | 'premium';
+type Plan = 'free' | 'croissance' | 'liberte' | 'premium';
 
-const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; features: string[] }[] = [
+const PLANS: { key: Plan; label: string; price?: string; badgeClass: string; cardClass: string; ringClass: string; features: string[] }[] = [
   {
     key: 'free',
-    label: 'Free',
+    label: 'Essentiel',
     badgeClass: 'bg-gray-50 text-gray-500 border-gray-200',
     cardClass: 'border-gray-200 bg-gray-50',
+    ringClass: 'ring-gray-400',
     features: [],
   },
   {
-    key: 'liberte',
-    label: 'Liberté',
+    key: 'croissance',
+    label: 'Croissance',
+    price: '129 € / mois',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
     cardClass: 'border-blue-200 bg-blue-50',
+    ringClass: 'ring-blue-400',
     features: [
       'Statistiques de base',
       'Gestion de service & cuisine',
@@ -26,10 +29,12 @@ const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; 
     ],
   },
   {
-    key: 'premium',
-    label: 'Premium ★',
-    badgeClass: 'bg-yellow-50 text-yellow-700 border-yellow-200',
-    cardClass: 'border-yellow-200 bg-yellow-50',
+    key: 'liberte',
+    label: 'Liberté',
+    price: '149 € / mois',
+    badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
+    cardClass: 'border-purple-200 bg-purple-50',
+    ringClass: 'ring-purple-400',
     features: [
       'Statistiques avancées',
       'Gestion de service & cuisine',
@@ -44,7 +49,7 @@ const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; 
 interface Props {
   restaurantId: string;
   restaurantName: string;
-  currentPlan: Plan;
+  currentPlan: 'free' | 'croissance' | 'liberte' | 'premium';
   onClose: () => void;
 }
 
@@ -98,7 +103,7 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
                     isCurrent
                       ? `${plan.cardClass} opacity-60 cursor-default`
                       : isSelected
-                      ? `${plan.cardClass} ring-2 ring-offset-1 ${plan.key === 'premium' ? 'ring-yellow-400' : plan.key === 'liberte' ? 'ring-blue-400' : 'ring-gray-400'}`
+                      ? `${plan.cardClass} ring-2 ring-offset-1 ${plan.ringClass}`
                       : 'border-gray-100 bg-white hover:bg-gray-50 cursor-pointer'
                   }`}
                 >
@@ -113,6 +118,9 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
                   <span className={`px-2 py-0.5 rounded-full border ${plan.badgeClass}`}>
                     {plan.label}
                   </span>
+                  {plan.price && (
+                    <span className="text-[10px] text-gray-400">{plan.price}</span>
+                  )}
                 </button>
               );
             })}

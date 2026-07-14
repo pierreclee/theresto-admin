@@ -56,12 +56,22 @@ describe('RestaurantTable', () => {
 
   it('renders plan badge — premium', () => {
     render(<RestaurantTable restaurants={[makeRestaurant({ subscriptionPlan: 'premium' })]} loading={false} onRowClick={jest.fn()} />);
-    expect(screen.getByText('Premium ★')).toBeInTheDocument();
+    expect(screen.getByText('Premium')).toBeInTheDocument();
   });
 
   it('renders plan badge — free', () => {
     render(<RestaurantTable restaurants={[makeRestaurant({ subscriptionPlan: 'free' })]} loading={false} onRowClick={jest.fn()} />);
-    expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.getByText('Essentiel')).toBeInTheDocument();
+  });
+
+  it('renders plan badge — croissance', () => {
+    render(<RestaurantTable restaurants={[makeRestaurant({ subscriptionPlan: 'croissance' })]} loading={false} onRowClick={jest.fn()} />);
+    expect(screen.getByText('Croissance')).toBeInTheDocument();
+  });
+
+  it('renders plan badge — liberte', () => {
+    render(<RestaurantTable restaurants={[makeRestaurant({ subscriptionPlan: 'liberte' })]} loading={false} onRowClick={jest.fn()} />);
+    expect(screen.getByText('Liberté')).toBeInTheDocument();
   });
 
   it('calls onRowClick with the restaurant when a row is clicked', () => {

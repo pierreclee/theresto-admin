@@ -432,15 +432,14 @@ export function RestaurantDetail({ restaurant }: Props) {
             <ActionRow
               icon={Star}
               label="Abonnement"
-              sublabel={
-                restaurant.subscriptionPlan === 'premium'
-                  ? 'Premium ★ — cliquer pour modifier'
-                  : restaurant.subscriptionPlan === 'liberte'
-                  ? 'Liberté — cliquer pour modifier'
-                  : 'Free — cliquer pour modifier'
-              }
+              sublabel={{
+                liberte:    'Liberté — cliquer pour modifier',
+                croissance: 'Croissance — cliquer pour modifier',
+                premium:    'Premium — cliquer pour modifier',
+                free:       'Essentiel — cliquer pour modifier',
+              }[restaurant.subscriptionPlan] ?? 'cliquer pour modifier'}
               onClick={() => setModal('subscription')}
-              accent={restaurant.subscriptionPlan === 'premium'}
+              accent={restaurant.subscriptionPlan === 'liberte'}
             />
             <ActionRow
               icon={Percent}

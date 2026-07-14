@@ -13,9 +13,10 @@ const approvalLabel: Record<string, { label: string; className: string }> = {
 };
 
 const planLabel: Record<string, { label: string; className: string }> = {
-  premium: { label: 'Premium ★', className: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
-  liberte: { label: 'Liberté', className: 'bg-blue-50 text-blue-700 border-blue-100' },
-  free:    { label: 'Free', className: 'bg-gray-50 text-gray-500 border-gray-100' },
+  liberte:    { label: 'Liberté', className: 'bg-purple-50 text-purple-700 border-purple-100' },
+  croissance: { label: 'Croissance', className: 'bg-blue-50 text-blue-700 border-blue-100' },
+  free:       { label: 'Essentiel', className: 'bg-gray-50 text-gray-500 border-gray-100' },
+  premium:    { label: 'Premium', className: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
 };
 
 function StatusBadge({ value, map }: { value: string; map: typeof approvalLabel }) {
