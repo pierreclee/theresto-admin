@@ -52,8 +52,17 @@ export async function requireAdmin() {
   const supabase = await createClient();
   const { data: { user }, error } = await supabase.auth.getUser();
   
-  if (error || !user || user.app_metadata?.admin !== true) {
-    throw new Error('Unauthorized or not an admin');
+  if (error) {
+    console.error('Supabase Auth Error in requireAdmin:', error);
+    throw new Error(`Auth Error: ${error.message}`);
+  }
+  
+  if (!user) {
+    throw new Error('Unauthorized: No user session found on server (cookies might not be sent or token invalid).');
+  }
+  
+  if (user.app_metadata?.admin !== true) {
+    throw new Error(`Unauthorized: User is not an admin. Current app_metadata: ${JSON.stringify(user.app_metadata)}`);
   }
   
   return user;
