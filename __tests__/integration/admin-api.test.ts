@@ -46,7 +46,7 @@ describe('Admin API Integration Tests', () => {
     });
 
     it('should handle non-Error inputs', () => {
-      const result = parseFirebaseError('string error');
+      const result = parseSupabaseError('string error');
       expect(result.code).toBe('INTERNAL');
     });
   });

@@ -101,7 +101,7 @@ export async function moderateUserAction(
   let newStatus = 'active';
   if (action === 'suspend') newStatus = 'suspended';
   if (action === 'ban') newStatus = 'banned';
-  if (action === 'warn') newStatus = 'active';
+  if (action === 'activate') newStatus = 'active';
   
   const payload: any = {
     moderation_status: newStatus,

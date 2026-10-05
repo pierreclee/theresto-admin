@@ -23,13 +23,10 @@ export async function getStatsAction(): Promise<PlatformStats> {
 
   return {
     totalRestaurants: activeRestaurants || 0,
-    activeRestaurants: activeRestaurants || 0,
     pendingApprovals: pendingApprovals || 0,
-    totalUsers: totalUsers || 0,
-    activeUsers: activeUsers || 0,
-    monthlyRecurringRevenue: 0,
-    totalTransactions30d: 0,
-    systemHealth: 'operational',
+    activeToday: activeUsers || 0,
+    premiumCount: 0, // Mocked for now
+    platformRevenueMTD: 0, // Mocked for now
   };
 }
 
@@ -121,7 +118,8 @@ export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ log
   let query = adminDb.from('audit_logs').select('*', { count: 'exact' });
   
   if (filters.action) query = query.eq('action', filters.action);
-  if (filters.targetId) query = query.eq('target_id', filters.targetId);
+  if (filters.resourceType) query = query.eq('resource_type', filters.resourceType);
+  if (filters.adminId) query = query.eq('admin_id', filters.adminId);
   if (filters.limit) query = query.limit(filters.limit);
   
   query = query.order('created_at', { ascending: false });
