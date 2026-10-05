@@ -14,19 +14,24 @@ export async function getStatsAction(): Promise<PlatformStats> {
   
   // Example dummy logic since we don't have the exact DB views yet
   // In a real scenario, this might call a Supabase RPC or count tables
-  const [{ count: activeRestaurants }, { count: pendingApprovals }, { count: totalUsers }, { count: activeUsers }] = await Promise.all([
-    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+  const [
+    { count: totalRestaurants },
+    { count: pendingApprovals },
+    { count: premiumRestaurants },
+    { count: activeUsers }
+  ] = await Promise.all([
+    adminDb.from('restaurants').select('*', { count: 'exact', head: true }),
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'premium'),
     adminDb.from('users').select('*', { count: 'exact', head: true }),
-    adminDb.from('users').select('*', { count: 'exact', head: true }).eq('status', 'active'),
   ]);
 
   return {
-    totalRestaurants: activeRestaurants || 0,
+    totalRestaurants: totalRestaurants || 0,
     pendingApprovals: pendingApprovals || 0,
     activeToday: activeUsers || 0,
-    premiumCount: 0, // Mocked for now
-    platformRevenueMTD: 0, // Mocked for now
+    premiumCount: premiumRestaurants || 0,
+    platformRevenueMTD: 0, // Requires an SQL sum() RPC or bookings aggregation
   };
 }
 
