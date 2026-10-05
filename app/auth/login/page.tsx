@@ -2,20 +2,23 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithEmailAndPassword, getMultiFactorResolver } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { createClient, getClientEnvironment } from '@/lib/supabase/client';
+import type { AppEnvironment } from '@/lib/supabase/config';
 import { LoginFormSchema } from '@/lib/utils/validators';
-import { isMFAError, type MFASession } from '@/lib/mfa/utils';
-import { storeMfaResolver } from '@/lib/mfa/resolver-store';
 
 export default function LoginPage() {
   const router = useRouter();
+  const [env, setEnv] = useState<AppEnvironment>('staging');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setEnv(getClientEnvironment());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,63 +26,39 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // Set the environment cookie first so all subsequent requests (and the server) know which DB to hit
+      document.cookie = `theresto_env=${env}; path=/; max-age=31536000; SameSite=Lax`;
+      
+      const supabase = createClient(env);
       const validated = LoginFormSchema.parse({ email, password });
 
-      try {
-        // Try to sign in
-        const result = await signInWithEmailAndPassword(
-          auth,
-          validated.email,
-          validated.password
-        );
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
+      });
 
-        const idTokenResult = await result.user.getIdTokenResult(true);
+      if (signInError) {
+        setError(signInError.message);
+        setLoading(false);
+        return;
+      }
 
-        if (idTokenResult.claims.admin !== true) {
-          setError('Accès administrateur requis');
-          setLoading(false);
-          return;
-        }
+      const user = data.user;
+      if (user?.app_metadata?.admin !== true) {
+        await supabase.auth.signOut();
+        setError('Accès administrateur requis');
+        setLoading(false);
+        return;
+      }
 
-        // Successfully authenticated, no MFA required
+      // Check MFA requirement
+      const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      
+      if (mfaData && mfaData.nextLevel === 'aal2' && mfaData.currentLevel === 'aal1') {
+        router.push('/auth/mfa-challenge');
+      } else {
         localStorage.setItem('adminSessionStart', Date.now().toString());
         router.push('/');
-      } catch (signInError: any) {
-        console.log('Sign-in error:', signInError);
-        console.log('Error code:', signInError.code);
-        console.log('Is MFA error?', isMFAError(signInError));
-
-        // Check if MFA is required
-        if (isMFAError(signInError)) {
-          console.log('MFA required, redirecting...');
-
-          try {
-            // Get the resolver using Firebase's proper function
-            const resolver = getMultiFactorResolver(auth, signInError);
-            console.log('Resolver obtained:', !!resolver);
-
-            // Store MFA session for the challenge page
-            storeMfaResolver(resolver, validated.email);
-
-            console.log('MFA resolver stored, navigating to challenge...');
-            router.push('/auth/mfa-challenge');
-          } catch (resolverError) {
-            console.error('Failed to get MFA resolver:', resolverError);
-            setError('Erreur lors de la récupération du résolveur MFA');
-            setLoading(false);
-          }
-        } else {
-          // Regular sign-in error
-          console.log('Regular error, not MFA');
-          if (signInError instanceof Error) {
-            setError(signInError.message);
-            console.log('Error message:', signInError.message);
-          } else {
-            setError('Erreur de connexion');
-            console.log('Unknown error');
-          }
-          setLoading(false);
-        }
       }
     } catch (err) {
       if (err instanceof Error) {
@@ -95,9 +74,31 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
       <div className="w-full max-w-md p-8 bg-white rounded-lg shadow-lg">
         <h1 className="text-3xl font-bold text-center mb-2 text-gray-900">Admin TheResto</h1>
-        <p className="text-center text-gray-600 mb-8">Plateforme d&apos;administration</p>
+        <p className="text-center text-gray-600 mb-6">Plateforme d&apos;administration</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setEnv('staging')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                env === 'staging' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Staging
+            </button>
+            <button
+              type="button"
+              onClick={() => setEnv('production')}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
+                env === 'production' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Production
+            </button>
+          </div>
+
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
               Email

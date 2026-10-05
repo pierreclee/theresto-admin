@@ -1,8 +1,8 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged, signOut as firebaseSignOut, multiFactor, User } from 'firebase/auth';
+import { createClient } from '@/lib/supabase/client';
+import { User } from '@supabase/supabase-js';
 import { AuthContextType } from './types';
 import { AdminUser } from '@/lib/types/admin';
 
@@ -22,59 +22,87 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!mounted) return; // Don't run on server
+    if (!mounted) return;
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      try {
-        if (firebaseUser) {
-          const idTokenResult = await firebaseUser.getIdTokenResult(true);
-          const isAdmin = idTokenResult.claims.admin === true;
-          // Check custom claim, actual Firebase enrollment, or post-challenge flag
-          const hasMfaClaim = idTokenResult.claims.mfaEnrolled === true;
-          const hasMfaActual = (multiFactor(firebaseUser).enrolledFactors?.length ?? 0) > 0;
-          const hasMfaVerified = localStorage.getItem('mfaVerified') === 'true';
-          const hasMfa = hasMfaClaim || hasMfaActual || hasMfaVerified;
+    const supabase = createClient();
 
-          setAdminUser({
-            uid: firebaseUser.uid,
-            email: firebaseUser.email || '',
-            displayName: firebaseUser.displayName || undefined,
-            admin: isAdmin,
-            mfaEnrolled: hasMfa,
-          });
+    const handleUser = async (supabaseUser: User | null) => {
+      if (supabaseUser) {
+        const isAdmin = supabaseUser.app_metadata?.admin === true;
+        
+        const { data: mfaData, error: mfaError } = await supabase.auth.mfa.listFactors();
+        const hasMfaActual = !mfaError && (mfaData?.totp?.length > 0 || mfaData?.all?.length > 0);
+        
+        const hasMfaClaim = supabaseUser.app_metadata?.mfaEnrolled === true;
+        const hasMfaVerified = localStorage.getItem('mfaVerified') === 'true';
+        const hasMfa = hasMfaClaim || hasMfaActual || hasMfaVerified;
 
-          if (isAdmin && hasMfa) {
-            const sessionStart = localStorage.getItem('adminSessionStart');
-            const isValid = sessionStart
-              ? Date.now() - parseInt(sessionStart) < 2 * 60 * 60 * 1000
-              : false;
-            setSessionValid(isValid);
-          }
+        setAdminUser({
+          uid: supabaseUser.id,
+          email: supabaseUser.email || '',
+          displayName: supabaseUser.user_metadata?.displayName || undefined,
+          admin: isAdmin,
+          mfaEnrolled: hasMfa,
+        });
+
+        if (isAdmin && hasMfa) {
+          const sessionStart = localStorage.getItem('adminSessionStart');
+          const isValid = sessionStart
+            ? Date.now() - parseInt(sessionStart) < 2 * 60 * 60 * 1000
+            : false;
+          setSessionValid(isValid);
         } else {
-          setAdminUser(null);
           setSessionValid(false);
-          localStorage.removeItem('adminSessionStart');
-          localStorage.removeItem('mfaVerified');
         }
+      } else {
+        setAdminUser(null);
+        setSessionValid(false);
+        localStorage.removeItem('adminSessionStart');
+        localStorage.removeItem('mfaVerified');
+      }
 
-        setUser(firebaseUser);
+      setUser(supabaseUser);
+      setLoading(false);
+    };
+
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        
+        await handleUser(session?.user || null);
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+          await handleUser(session?.user || null);
+        });
+
+        return subscription;
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Auth error'));
-      } finally {
         setLoading(false);
       }
+    };
+
+    let authSubscription: { unsubscribe: () => void } | undefined;
+    
+    initializeAuth().then(sub => {
+      if (sub) authSubscription = sub;
     });
 
-    return unsubscribe;
+    return () => {
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
+    };
   }, [mounted]);
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    const supabase = createClient();
+    await supabase.auth.signOut();
     localStorage.removeItem('adminSessionStart');
     localStorage.removeItem('mfaVerified');
   };
 
-  // During SSR, return empty state (will be hydrated on client)
   if (!mounted) {
     return <AuthContext.Provider value={{
       user: null,

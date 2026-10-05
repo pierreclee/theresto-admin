@@ -12,8 +12,9 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.117.2",
     "@tanstack/react-query": "^5.101.0",
-    "firebase": "^12.14.0",
     "lucide-react": "^1.17.0",
     "next": "16.2.7",
     "next-themes": "^0.4.6",

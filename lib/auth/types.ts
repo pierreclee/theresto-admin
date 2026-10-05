@@ -1,4 +1,4 @@
-import { User } from 'firebase/auth';
+import { User } from '@supabase/supabase-js';
 import { AdminUser } from '@/lib/types/admin';
 
 export interface AuthContextType {

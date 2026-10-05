@@ -1,4 +1,4 @@
-export type FirebaseErrorCode =
+export type SupabaseErrorCode =
   | 'PERMISSION_DENIED'
   | 'UNAUTHENTICATED'
   | 'INVALID_ARGUMENT'
@@ -8,7 +8,7 @@ export type FirebaseErrorCode =
 
 export class AdminError extends Error {
   constructor(
-    public code: FirebaseErrorCode,
+    public code: SupabaseErrorCode,
     message: string,
     public originalError?: Error,
   ) {
@@ -17,25 +17,20 @@ export class AdminError extends Error {
   }
 }
 
-export function parseFirebaseError(error: unknown): AdminError {
+export function parseSupabaseError(error: unknown): AdminError {
   if (error instanceof Error) {
     const code = (error as any).code as string | undefined;
     const message = error.message;
 
-    if (code?.includes('permission-denied') || message.includes('permission-denied')) {
+    // Map common PostgreSQL / Supabase PostgREST error codes
+    if (code === '42501' || message.toLowerCase().includes('permission denied')) {
       return new AdminError('PERMISSION_DENIED', 'Accès refusé', error);
     }
-    if (code?.includes('unauthenticated') || message.includes('unauthenticated')) {
+    if (code === 'PGRST301' || message.toLowerCase().includes('unauthorized')) {
       return new AdminError('UNAUTHENTICATED', 'Non authentifié', error);
     }
-    if (code?.includes('invalid-argument') || message.includes('invalid-argument')) {
-      return new AdminError('INVALID_ARGUMENT', 'Argument invalide', error);
-    }
-    if (code?.includes('not-found') || message.includes('not-found')) {
+    if (code === 'PGRST116' || message.toLowerCase().includes('not found')) {
       return new AdminError('NOT_FOUND', 'Non trouvé', error);
-    }
-    if (code?.includes('resource-exhausted') || message.includes('resource-exhausted')) {
-      return new AdminError('RESOURCE_EXHAUSTED', 'Limite atteinte', error);
     }
 
     return new AdminError('INTERNAL', message || 'Erreur interne', error);

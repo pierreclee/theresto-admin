@@ -2,30 +2,16 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MultiFactorResolver } from 'firebase/auth';
-import { verifyTOTPCode } from '@/lib/mfa/utils';
-import { getMfaResolver, clearMfaResolver } from '@/lib/mfa/resolver-store';
+import { createClient } from '@/lib/supabase/client';
 
 export default function MFAChallengePage() {
   const router = useRouter();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [verifying, setVerifying] = useState(false);
-  const [resolver, setResolver] = useState<MultiFactorResolver | null>(null);
-
-  // Retrieve MFA resolver from previous login attempt
-  useEffect(() => {
-    const { resolver: storedResolver } = getMfaResolver();
-
-    if (!storedResolver) {
-      router.push('/auth/login');
-      return;
-    }
-
-    setResolver(storedResolver);
-  }, [router]);
+  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,65 +19,42 @@ export default function MFAChallengePage() {
     setVerifying(true);
 
     try {
-      if (!resolver) {
-        setError('Session MFA expirée, veuillez vous reconnecter');
-        setVerifying(false);
-        return;
-      }
-
       if (!code || code.length !== 6) {
         setError('Code invalide (6 chiffres requis)');
         setVerifying(false);
         return;
       }
 
-      // Set mfaVerified before resolveSignIn so onAuthStateChanged reads it immediately
+      // 1. Fetch user's MFA factors
+      const { data: mfaData, error: listError } = await supabase.auth.mfa.listFactors();
+      if (listError) throw listError;
+
+      const totpFactor = mfaData?.totp?.[0];
+      if (!totpFactor) throw new Error('Aucun facteur TOTP configuré pour ce compte');
+
+      // 2. Create a challenge
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
+      if (challengeError) throw challengeError;
+
+      // 3. Verify the code against the challenge
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: totpFactor.id,
+        challengeId: challengeData.id,
+        code
+      });
+
+      if (verifyError) throw verifyError;
+
+      // Ensure flags are updated and proceed
       localStorage.setItem('mfaVerified', 'true');
       localStorage.setItem('adminSessionStart', Date.now().toString());
-
-      let userCredential;
-      try {
-        userCredential = await verifyTOTPCode(resolver, code);
-      } catch (verifyErr) {
-        // Verification failed — clear optimistic flags
-        localStorage.removeItem('mfaVerified');
-        localStorage.removeItem('adminSessionStart');
-        throw verifyErr;
-      }
-
-      // Verify admin claim
-      const idTokenResult = await userCredential.user.getIdTokenResult(true);
-      if (idTokenResult.claims.admin !== true) {
-        localStorage.removeItem('mfaVerified');
-        localStorage.removeItem('adminSessionStart');
-        setError('Accès administrateur requis');
-        setVerifying(false);
-        return;
-      }
-
-      clearMfaResolver();
-
+      
       router.push('/');
-    } catch (err) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Erreur de vérification MFA');
-      }
+    } catch (err: any) {
+      setError(err.message || 'Erreur de vérification MFA');
       setVerifying(false);
     }
   };
-
-  if (!resolver) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          <p className="mt-4 text-gray-700">Chargement de la vérification MFA...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="flex items-center justify-center min-h-screen bg-gray-50">
@@ -128,7 +91,7 @@ export default function MFAChallengePage() {
 
           <button
             type="submit"
-            disabled={verifying || !code}
+            disabled={verifying || code.length !== 6}
             className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {verifying ? 'Vérification...' : 'Vérifier'}
@@ -140,7 +103,7 @@ export default function MFAChallengePage() {
             onClick={() => router.push('/auth/login')}
             className="text-center text-sm text-blue-600 hover:text-blue-700 w-full py-2"
           >
-            Utiliser un code de secours
+            Retourner à la connexion
           </button>
         </div>
       </div>
