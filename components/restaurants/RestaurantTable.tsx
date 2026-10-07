@@ -44,12 +44,12 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
           { key: 'name', label: 'Restaurant', width: 'w-1/4' },
           { key: 'email', label: 'Email', width: 'w-1/4' },
           {
-            key: 'approvalStatus',
+            key: 'approval_status',
             label: 'Statut',
             render: (v) => <StatusBadge value={String(v)} map={approvalLabel} />,
           },
           {
-            key: 'subscriptionPlan',
+            key: 'subscription_plan',
             label: 'Plan',
             render: (v, row) => (
               <button
@@ -63,7 +63,7 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
             ),
           },
           {
-            key: 'monthlyRevenue',
+            key: 'monthly_revenue',
             label: 'Revenu (MTD)',
             render: (v) =>
               ((v as number) || 0).toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }),
@@ -79,7 +79,7 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
         <SubscriptionModal
           restaurantId={subscriptionTarget.id}
           restaurantName={subscriptionTarget.name}
-          currentPlan={subscriptionTarget.subscriptionPlan}
+          currentPlan={(subscriptionTarget.subscription_plan ?? subscriptionTarget.subscriptionPlan ?? 'free') as 'free' | 'croissance' | 'liberte' | 'premium'}
           onClose={() => setSubscriptionTarget(null)}
         />
       )}

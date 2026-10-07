@@ -178,8 +178,8 @@ export function RestaurantDetail({ restaurant }: Props) {
   const formatCurrency = (v: number) =>
     v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
-  const approvalCfg = approvalConfig[restaurant.approvalStatus as ApprovalKey] ?? approvalConfig.pending;
-  const isPending = restaurant.approvalStatus === 'pending';
+  const approvalCfg = approvalConfig[(restaurant.approval_status || restaurant.approvalStatus) as ApprovalKey] ?? approvalConfig.pending;
+  const isPending = (restaurant.approval_status || restaurant.approvalStatus) === 'pending';
 
   return (
     <>
@@ -210,9 +210,9 @@ export function RestaurantDetail({ restaurant }: Props) {
             <div className="flex items-center gap-2 flex-wrap">
               <h2 className="text-xl font-bold text-gray-900">{restaurant.name}</h2>
             <p className="text-xs font-mono text-gray-400 mt-0.5">{restaurant.id}</p>
-              {restaurant.establishmentType && (
+              {(restaurant.establishment_type || restaurant.establishmentType) && (
                 <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-medium">
-                  {ESTABLISHMENT_LABELS[restaurant.establishmentType] ?? restaurant.establishmentType}
+                  {ESTABLISHMENT_LABELS[restaurant.establishment_type || restaurant.establishmentType || ''] ?? (restaurant.establishment_type || restaurant.establishmentType)}
                 </span>
               )}
             </div>
@@ -221,14 +221,14 @@ export function RestaurantDetail({ restaurant }: Props) {
               <div className="flex items-center gap-1 mt-1">
                 <Star size={12} className="text-yellow-500 fill-yellow-500" />
                 <span className="text-xs font-semibold text-gray-700">{restaurant.rating.toFixed(1)}</span>
-                {restaurant.reviewCount != null && (
-                  <span className="text-xs text-gray-400">({restaurant.reviewCount} avis)</span>
+                {(restaurant.review_count ?? restaurant.reviewCount) != null && (
+                  <span className="text-xs text-gray-400">({restaurant.review_count ?? restaurant.reviewCount} avis)</span>
                 )}
               </div>
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <ApprovalBadge status={restaurant.approvalStatus} />
+            <ApprovalBadge status={String((restaurant.approval_status ?? restaurant.approvalStatus) || 'pending')} />
             <button
               onClick={() => setModal('edit')}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-200 hover:border-gray-300 rounded-lg transition-colors"
@@ -240,13 +240,13 @@ export function RestaurantDetail({ restaurant }: Props) {
         </div>
 
         {/* Photo principale */}
-        {restaurant.mainPhotoUrl && (
+        {(restaurant.main_photo_url || restaurant.mainPhotoUrl) && (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <SectionHeader title="Photo principale" />
             <div className="p-3">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={restaurant.mainPhotoUrl}
+                src={restaurant.main_photo_url || restaurant.mainPhotoUrl || ''}
                 alt={restaurant.name}
                 className="w-full h-48 object-cover rounded-lg"
               />
@@ -267,7 +267,7 @@ export function RestaurantDetail({ restaurant }: Props) {
           <SectionHeader title="Coordonnées" />
           <div className="px-5">
             <InfoRow icon={Mail} label="Email" value={restaurant.email} />
-            <InfoRow icon={Phone} label="Téléphone" value={restaurant.phone ?? ''} />
+            <InfoRow icon={Phone} label="Téléphone" value={restaurant.phone_number ?? restaurant.phone ?? ''} />
             <InfoRow icon={MapPin} label="Adresse" value={restaurant.address ?? ''} />
             {restaurant.contact?.website && (
               <InfoRow
@@ -320,44 +320,44 @@ export function RestaurantDetail({ restaurant }: Props) {
         )}
 
         {/* Types de cuisine */}
-        {(restaurant.cuisineTypes?.length ?? 0) > 0 && (
+        {((restaurant.cuisine_types ?? restaurant.cuisineTypes)?.length ?? 0) > 0 && (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <SectionHeader title="Types de cuisine" />
-            <TagList tags={restaurant.cuisineTypes ?? []} color="orange" />
+            <TagList tags={restaurant.cuisine_types ?? restaurant.cuisineTypes ?? []} color="orange" />
           </div>
         )}
 
         {/* Tags */}
-        {((restaurant.dietTags?.length ?? 0) > 0 ||
-          (restaurant.atmosphereTags?.length ?? 0) > 0 ||
-          (restaurant.serviceTags?.length ?? 0) > 0) && (
+        {(((restaurant.diet_tags ?? restaurant.dietTags)?.length ?? 0) > 0 ||
+          ((restaurant.atmosphere_tags ?? restaurant.atmosphereTags)?.length ?? 0) > 0 ||
+          ((restaurant.service_tags ?? restaurant.serviceTags)?.length ?? 0) > 0) && (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
             <SectionHeader title="Tags" />
-            {(restaurant.dietTags?.length ?? 0) > 0 && (
+            {((restaurant.diet_tags ?? restaurant.dietTags)?.length ?? 0) > 0 && (
               <div className="px-5 pt-3">
                 <p className="text-xs text-gray-400 mb-1.5">Régimes alimentaires</p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                  {restaurant.dietTags!.map((t) => (
+                  {(restaurant.diet_tags ?? restaurant.dietTags)!.map((t) => (
                     <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium bg-green-50 text-green-700">{t}</span>
                   ))}
                 </div>
               </div>
             )}
-            {(restaurant.atmosphereTags?.length ?? 0) > 0 && (
+            {((restaurant.atmosphere_tags ?? restaurant.atmosphereTags)?.length ?? 0) > 0 && (
               <div className="px-5 pt-1">
                 <p className="text-xs text-gray-400 mb-1.5">Ambiance</p>
                 <div className="flex flex-wrap gap-1.5 mb-3">
-                  {restaurant.atmosphereTags!.map((t) => (
+                  {(restaurant.atmosphere_tags ?? restaurant.atmosphereTags)!.map((t) => (
                     <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-700">{t}</span>
                   ))}
                 </div>
               </div>
             )}
-            {(restaurant.serviceTags?.length ?? 0) > 0 && (
+            {((restaurant.service_tags ?? restaurant.serviceTags)?.length ?? 0) > 0 && (
               <div className="px-5 pt-1 pb-3">
                 <p className="text-xs text-gray-400 mb-1.5">Services</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {restaurant.serviceTags!.map((t) => (
+                  {(restaurant.service_tags ?? restaurant.serviceTags)!.map((t) => (
                     <span key={t} className="text-xs px-2 py-0.5 rounded-full font-medium bg-purple-50 text-purple-700">{t}</span>
                   ))}
                 </div>
@@ -373,7 +373,7 @@ export function RestaurantDetail({ restaurant }: Props) {
             <InfoRow
               icon={CreditCard}
               label="Mollie Connect"
-              value={restaurant.isMollieConnected ? 'Connecté ✓' : 'Non connecté'}
+              value={(restaurant.is_mollie_connected ?? restaurant.isMollieConnected) ? 'Connecté ✓' : 'Non connecté'}
             />
           </div>
           <div className="grid grid-cols-2 gap-3 p-4">
@@ -382,14 +382,14 @@ export function RestaurantDetail({ restaurant }: Props) {
                 <TrendingUp size={12} className="text-green-600" />
                 <p className="text-xs text-gray-500">Revenu total</p>
               </div>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(restaurant.totalRevenue ?? 0)}</p>
+              <p className="text-lg font-bold text-gray-900">{formatCurrency((restaurant.total_revenue ?? restaurant.totalRevenue) ?? 0)}</p>
             </div>
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <div className="flex items-center gap-1.5 mb-1.5">
                 <TrendingUp size={12} className="text-blue-500" />
                 <p className="text-xs text-gray-500">Revenu du mois</p>
               </div>
-              <p className="text-lg font-bold text-gray-900">{formatCurrency(restaurant.monthlyRevenue ?? 0)}</p>
+              <p className="text-lg font-bold text-gray-900">{formatCurrency((restaurant.monthly_revenue ?? restaurant.monthlyRevenue) ?? 0)}</p>
             </div>
           </div>
         </div>
@@ -398,30 +398,40 @@ export function RestaurantDetail({ restaurant }: Props) {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <SectionHeader title="Informations techniques" />
           <div className="px-5">
-            {restaurant.ownerId && (
-              <InfoRow icon={User} label="Propriétaire (UID)" value={restaurant.ownerId} mono />
+            {(restaurant.owner_id ?? restaurant.ownerId) && (
+              <InfoRow icon={User} label="Propriétaire (UID)" value={restaurant.owner_id ?? restaurant.ownerId ?? ''} mono />
             )}
-            {restaurant.createdAt && (
-              <InfoRow icon={CalendarDays} label="Créé le" value={formatDate(restaurant.createdAt) ?? ''} />
+            {(restaurant.created_at ?? restaurant.createdAt) && (
+              <InfoRow icon={CalendarDays} label="Créé le" value={formatDate(restaurant.created_at ?? restaurant.createdAt) ?? ''} />
             )}
-            {restaurant.updatedAt && (
-              <InfoRow icon={CalendarDays} label="Mis à jour le" value={formatDate(restaurant.updatedAt) ?? ''} />
+            {(restaurant.updated_at ?? restaurant.updatedAt) && (
+              <InfoRow icon={CalendarDays} label="Mis à jour le" value={formatDate(restaurant.updated_at ?? restaurant.updatedAt) ?? ''} />
             )}
           </div>
         </div>
 
         {/* Rejet */}
-        {restaurant.rejectionReason && (
+        {(restaurant.rejection_reason ?? restaurant.rejectionReason) && (
           <div className="bg-red-50 border border-red-100 rounded-xl p-4">
             <p className="text-xs font-semibold text-red-700 uppercase tracking-wide mb-1">
               Motif de rejet
-              {restaurant.rejectedAt && (
+              {(restaurant.rejected_at ?? restaurant.rejectedAt) && (
                 <span className="ml-2 font-normal normal-case text-red-400">
-                  ({formatDate(restaurant.rejectedAt)})
+                  ({formatDate(restaurant.rejected_at ?? restaurant.rejectedAt)})
                 </span>
               )}
             </p>
-            <p className="text-sm text-red-800">{restaurant.rejectionReason}</p>
+            <p className="text-sm text-red-800">{restaurant.rejection_reason ?? restaurant.rejectionReason}</p>
+            {restaurant.sections_to_fix && restaurant.sections_to_fix.length > 0 && (
+              <div className="mt-2">
+                <p className="text-xs text-red-700 font-semibold mb-1">Sections à corriger :</p>
+                <ul className="text-xs text-red-700 list-disc list-inside space-y-0.5">
+                  {restaurant.sections_to_fix.map((section) => (
+                    <li key={section}>{section}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
@@ -429,22 +439,28 @@ export function RestaurantDetail({ restaurant }: Props) {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <SectionHeader title="Gestion" />
           <div className="p-3 space-y-1.5">
-            <ActionRow
-              icon={Star}
-              label="Abonnement"
-              sublabel={{
+            {(() => {
+              const plan = (restaurant.subscription_plan ?? restaurant.subscriptionPlan) as string;
+              const labels: Record<string, string> = {
                 liberte:    'Liberté — cliquer pour modifier',
                 croissance: 'Croissance — cliquer pour modifier',
                 premium:    'Premium — cliquer pour modifier',
                 free:       'Essentiel — cliquer pour modifier',
-              }[restaurant.subscriptionPlan] ?? 'cliquer pour modifier'}
-              onClick={() => setModal('subscription')}
-              accent={restaurant.subscriptionPlan === 'liberte'}
-            />
+              };
+              return (
+                <ActionRow
+                  icon={Star}
+                  label="Abonnement"
+                  sublabel={labels[plan] ?? 'cliquer pour modifier'}
+                  onClick={() => setModal('subscription')}
+                  accent={plan === 'liberte'}
+                />
+              );
+            })()}
             <ActionRow
               icon={Percent}
               label="Commission TheResto"
-              sublabel={`Taux actuel : ${restaurant.commissionRate}%`}
+              sublabel={`Taux actuel : ${restaurant.commission_rate ?? restaurant.commissionRate}%`}
               onClick={() => setModal('fee')}
             />
             <ActionRow
@@ -462,7 +478,7 @@ export function RestaurantDetail({ restaurant }: Props) {
           isOpen
           onClose={() => setModal(null)}
           restaurantId={restaurant.id}
-          currentFee={restaurant.commissionRate}
+          currentFee={(restaurant.commission_rate ?? restaurant.commissionRate) ?? 5}
         />
       )}
 
@@ -470,7 +486,7 @@ export function RestaurantDetail({ restaurant }: Props) {
         <SubscriptionModal
           restaurantId={restaurant.id}
           restaurantName={restaurant.name}
-          currentPlan={restaurant.subscriptionPlan}
+          currentPlan={(restaurant.subscription_plan ?? restaurant.subscriptionPlan ?? 'free') as 'free' | 'croissance' | 'liberte' | 'premium'}
           onClose={() => setModal(null)}
         />
       )}
@@ -479,7 +495,7 @@ export function RestaurantDetail({ restaurant }: Props) {
         <ApprovalModal
           restaurantId={restaurant.id}
           restaurantName={restaurant.name}
-          currentStatus={restaurant.approvalStatus as 'pending' | 'approved' | 'rejected' | 'suspended'}
+          currentStatus={(restaurant.approval_status ?? restaurant.approvalStatus) as 'pending' | 'approved' | 'rejected' | 'suspended'}
           onClose={() => setModal(null)}
         />
       )}

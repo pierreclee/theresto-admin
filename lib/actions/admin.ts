@@ -15,16 +15,20 @@ export async function getStatsAction(): Promise<PlatformStats> {
   // Example dummy logic since we don't have the exact DB views yet
   // In a real scenario, this might call a Supabase RPC or count tables
   const [
-    { count: totalRestaurants },
-    { count: pendingApprovals },
-    { count: premiumRestaurants },
-    { count: activeUsers }
+    { count: totalRestaurants, error: err1 },
+    { count: pendingApprovals, error: err2 },
+    { count: premiumRestaurants, error: err3 },
+    { count: activeUsers, error: err4 }
   ] = await Promise.all([
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }),
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'premium'),
     adminDb.from('users').select('*', { count: 'exact', head: true }),
   ]);
+
+  if (err1 || err2 || err3 || err4) {
+    console.error('Error fetching stats:', { err1, err2, err3, err4 });
+  }
 
   return {
     totalRestaurants: totalRestaurants || 0,
@@ -44,21 +48,21 @@ export async function getRestaurantsAction(filters?: {
 }): Promise<{ restaurants: Restaurant[]; total: number }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
-  
+
   let query = adminDb.from('restaurants').select('*', { count: 'exact' });
-  
-  if (filters?.status) query = query.eq('status', filters.status);
+
+  if (filters?.status) query = query.eq('approval_status', filters.status);
   if (filters?.subscription) query = query.eq('subscription_plan', filters.subscription);
   if (filters?.search) query = query.ilike('name', `%${filters.search}%`);
-  
+
   if (filters?.limit) {
     const offset = filters?.offset || 0;
     query = query.range(offset, offset + filters.limit - 1);
   }
-  
+
   const { data, count, error } = await query;
   if (error) throw new Error(error.message);
-  
+
   // Transform data as necessary based on DB structure
   return { restaurants: (data as any) || [], total: count || 0 };
 }
@@ -95,13 +99,67 @@ export async function approveRestaurantAction(
 ): Promise<{ success: boolean }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
-  
-  const payload: any = { status };
-  if (reason) payload.moderation_reason = reason;
-  if (correctionMode) payload.correction_mode = correctionMode;
-  
+
+  const payload: any = { approval_status: status };
+
+  if (status === 'rejected') {
+    if (reason) payload.rejection_reason = reason;
+    if (correctionMode) payload.correction_mode = correctionMode;
+    payload.rejected_at = new Date().toISOString();
+  } else if (status === 'approved') {
+    payload.approved_at = new Date().toISOString();
+  }
+
   const { error } = await adminDb.from('restaurants').update(payload).eq('id', restaurantId);
   if (error) throw new Error(error.message);
+
+  // Send notification email via Edge Function
+  const edgeFunctionUrl = process.env.SUPABASE_URL + '/functions/v1/admin-onboarding';
+  const supabaseKey = process.env.SUPABASE_ANON_KEY;
+
+  if (status === 'approved') {
+    await fetch(edgeFunctionUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        action: 'approveOnboardingRestaurant',
+        restaurantId,
+      }),
+    }).catch(err => console.error('Email notification failed:', err));
+  } else if (status === 'rejected') {
+    const { data: restaurant } = await adminDb.from('restaurants')
+      .select('name, owner_id').eq('id', restaurantId).single();
+
+    if (restaurant?.owner_id) {
+      const { data: owner } = await adminDb.from('users')
+        .select('email, display_name').eq('id', restaurant.owner_id).single();
+
+      if (owner?.email) {
+        // Send rejection email
+        await fetch(process.env.SUPABASE_URL + '/functions/v1/send-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({
+            to: owner.email,
+            subject: 'Votre restaurant — Décision d\'approbation',
+            template: 'RESTAURANT_REJECTED',
+            variables: {
+              RESTAURANT_NAME: restaurant.name ?? '',
+              REJECTION_REASON: reason ?? 'N/A',
+              CORRECTION_MODE: correctionMode ?? '',
+            },
+          }),
+        }).catch(err => console.error('Rejection email failed:', err));
+      }
+    }
+  }
+
   return { success: true };
 }
 

@@ -52,14 +52,14 @@ export function EditRestaurantModal({ restaurant, onClose }: Props) {
   const [form, setForm] = useState({
     name: restaurant.name || '',
     description: restaurant.description || '',
-    establishmentType: restaurant.establishmentType || '',
+    establishmentType: (restaurant.establishment_type || restaurant.establishmentType) || '',
     email: restaurant.email || restaurant.contact?.email || '',
-    phone: restaurant.phone || restaurant.contact?.phone || '',
+    phone: (restaurant.phone_number || restaurant.phone || restaurant.contact?.phone) || '',
     address: restaurant.address || '',
     website: restaurant.contact?.website || '',
     instagram: restaurant.contact?.instagram || '',
     facebook: restaurant.contact?.facebook || '',
-    cuisineTypes: (restaurant.cuisineTypes ?? []).join(', '),
+    cuisineTypes: ((restaurant.cuisine_types ?? restaurant.cuisineTypes) ?? []).join(', '),
   });
 
   const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>

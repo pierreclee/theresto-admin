@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { useRestaurants } from '@/lib/hooks/useRestaurants';
 import {
   LayoutDashboard,
   Store,
@@ -13,10 +14,12 @@ import {
   Settings,
   LogOut,
   ChevronRight,
+  Clock,
 } from 'lucide-react';
 
-const routes = [
+const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
   { href: '/', label: 'Tableau de bord', icon: LayoutDashboard, exact: true },
+  { href: '/approvals', label: 'Approbations', icon: Clock, badge: true },
   { href: '/restaurants', label: 'Restaurants', icon: Store },
   { href: '/users', label: 'Utilisateurs', icon: Users },
   { href: '/monitoring', label: 'Monitoring', icon: Activity },
@@ -28,6 +31,9 @@ export function Sidebar() {
   const { adminUser, signOut } = useAuth();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Fetch pending approvals count
+  const { data: pendingData } = useRestaurants({ status: 'pending' });
 
   if (pathname.startsWith('/auth/')) return null;
 
@@ -65,6 +71,9 @@ export function Sidebar() {
         {routes.map((route) => {
           const active = isActive(route);
           const Icon = route.icon;
+          const isApprovalsRoute = route.href === '/approvals';
+          const pendingCount = isApprovalsRoute ? (pendingData?.total ?? 0) : 0;
+
           return (
             <Link
               key={route.href}
@@ -80,7 +89,12 @@ export function Sidebar() {
                 className={`flex-shrink-0 transition-transform duration-150 ${active ? '' : 'group-hover:scale-110'}`}
               />
               <span className="flex-1">{route.label}</span>
-              {active && <ChevronRight size={14} className="opacity-70" />}
+              {pendingCount > 0 && (
+                <span className="px-2 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full flex-shrink-0">
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              )}
+              {active && !pendingCount && <ChevronRight size={14} className="opacity-70" />}
             </Link>
           );
         })}
