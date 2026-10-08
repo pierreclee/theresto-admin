@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { getSupabaseCredentials, type AppEnvironment } from './config';
 
@@ -31,21 +32,16 @@ export async function createClient() {
   );
 }
 
+// Service-role client. Must NOT read the auth cookies: @supabase/ssr would send
+// the signed-in admin's JWT instead of the service key, subjecting every query
+// to RLS (e.g. users_select_own → only the admin's own row).
 export async function getAdminClient() {
-  const cookieStore = await cookies();
   const env = await getServerEnvironment();
   const creds = getSupabaseCredentials(env);
 
-  return createServerClient(
-    creds.url,
-    creds.serviceKey,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        setAll() {},
-      },
-    }
-  );
+  return createSupabaseClient(creds.url, creds.serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
 }
 
 export async function requireAdmin() {
