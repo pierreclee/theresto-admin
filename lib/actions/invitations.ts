@@ -9,6 +9,8 @@ export type InviteRestaurantOwnerResult =
       email: string;
       onboardingUrl: string;
       expiresAt: string;
+      /** False: no account yet — the link leads to signup with the email pre-filled. */
+      hasAccount: boolean;
       /** False when the staging guard blocked the email (non-whitelisted domain). */
       emailSent: boolean;
     }

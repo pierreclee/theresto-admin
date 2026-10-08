@@ -7,6 +7,7 @@ import { useUserCrmProfile, useModerateUser } from '@/lib/hooks/useUsers';
 import { ModerationBadge } from './ModerationBadge';
 import { RoleBadge } from './RoleBadge';
 import { ModerationModal } from './ModerationModal';
+import { InviteRestaurantModal } from '@/components/restaurants/InviteRestaurantModal';
 
 const bookingStatusLabel: Record<string, string> = {
   pending: 'En attente',
@@ -31,6 +32,7 @@ interface Props {
 
 export function UserDetailModal({ user, onClose }: Props) {
   const [showModerationModal, setShowModerationModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const { data: profile, isPending } = useUserCrmProfile(user.id);
   const { mutateAsync: moderateUser } = useModerateUser();
 
@@ -218,8 +220,20 @@ export function UserDetailModal({ user, onClose }: Props) {
             )}
           </div>
 
-          {/* Footer — moderation action */}
-          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0">
+          {/* Footer — actions */}
+          <div className="px-5 py-4 border-t border-gray-100 flex-shrink-0 space-y-2">
+            {!liveUser.restaurantId && (
+              <button
+                onClick={() => setShowInviteModal(true)}
+                className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-200 hover:border-orange-200 hover:bg-orange-50 transition-colors group"
+              >
+                <div className="flex items-center gap-2">
+                  <Store size={14} className="text-gray-400 group-hover:text-orange-500 transition-colors" />
+                  <span className="text-sm font-medium text-gray-700">Inviter à créer un restaurant</span>
+                </div>
+                <ChevronRight size={14} className="text-gray-300 group-hover:text-orange-400" />
+              </button>
+            )}
             <button
               onClick={() => setShowModerationModal(true)}
               className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-200 hover:border-orange-200 hover:bg-orange-50 transition-colors group"
@@ -244,6 +258,13 @@ export function UserDetailModal({ user, onClose }: Props) {
             onClose={() => setShowModerationModal(false)}
           />
         </div>
+      )}
+
+      {showInviteModal && (
+        <InviteRestaurantModal
+          initialEmail={liveUser.email}
+          onClose={() => setShowInviteModal(false)}
+        />
       )}
     </>
   );

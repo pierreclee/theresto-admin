@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Copy, Check, Mail, AlertTriangle } from 'lucide-react';
+import { X, Copy, Check, Mail, AlertTriangle, UserPlus } from 'lucide-react';
 import {
   inviteRestaurantOwnerAction,
   type InviteRestaurantOwnerResult,
@@ -11,10 +11,12 @@ type Invitation = Extract<InviteRestaurantOwnerResult, { ok: true }>;
 
 interface Props {
   onClose: () => void;
+  /** Pre-filled and locked (e.g. when opened from a user's detail panel). */
+  initialEmail?: string;
 }
 
-export function InviteRestaurantModal({ onClose }: Props) {
-  const [email, setEmail] = useState('');
+export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
+  const [email, setEmail] = useState(initialEmail ?? '');
   const [error, setError] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
@@ -73,6 +75,14 @@ export function InviteRestaurantModal({ onClose }: Props) {
               </p>
             )}
 
+            {!invitation.hasAccount && (
+              <p className="flex items-start gap-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                <UserPlus size={14} className="shrink-0 mt-0.5" />
+                Pas encore de compte TheResto : le lien l’invite à s’inscrire avec cette adresse,
+                puis l’amène directement sur le formulaire de son restaurant.
+              </p>
+            )}
+
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">Lien d’invitation</p>
               <div className="flex gap-2">
@@ -92,7 +102,7 @@ export function InviteRestaurantModal({ onClose }: Props) {
               </div>
               <p className="text-xs text-gray-400 mt-1.5">
                 Valable jusqu’au {new Date(invitation.expiresAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.
-                La personne doit être connectée avec ce compte pour l’utiliser.
+                Utilisable uniquement avec un compte à l’adresse {invitation.email}.
               </p>
             </div>
 
@@ -106,18 +116,19 @@ export function InviteRestaurantModal({ onClose }: Props) {
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4">
             <p className="text-sm text-gray-600">
-              La personne doit déjà avoir un compte TheResto avec email confirmé.
+              Si la personne n’a pas encore de compte, le lien l’invitera à s’inscrire avec cette adresse.
               Une éventuelle invitation précédente sera annulée.
             </p>
 
             <input
               type="email"
               required
-              autoFocus
+              autoFocus={!initialEmail}
+              readOnly={!!initialEmail}
               placeholder="email@restaurant.fr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] read-only:bg-gray-50 read-only:text-gray-600"
             />
 
             {error && (
