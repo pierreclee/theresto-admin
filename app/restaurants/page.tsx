@@ -4,13 +4,15 @@ import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
 import { RestaurantTable } from '@/components/restaurants/RestaurantTable';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { InviteRestaurantModal } from '@/components/restaurants/InviteRestaurantModal';
+import { Search, SlidersHorizontal, UserPlus } from 'lucide-react';
 
 function RestaurantsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
+  const [showInvite, setShowInvite] = useState(false);
 
   const { data, isPending, error } = useRestaurants({
     search: search || undefined,
@@ -19,12 +21,23 @@ function RestaurantsContent() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-gray-900">Restaurants</h2>
-        <p className="text-sm text-gray-500 mt-0.5">
-          {data ? `${data.total} restaurant${data.total !== 1 ? 's' : ''}` : 'Chargement…'}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Restaurants</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {data ? `${data.total} restaurant${data.total !== 1 ? 's' : ''}` : 'Chargement…'}
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInvite(true)}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#FF6B35] hover:bg-[#e85f2d] rounded-xl transition-colors"
+        >
+          <UserPlus size={15} />
+          Inviter un restaurant
+        </button>
       </div>
+
+      {showInvite && <InviteRestaurantModal onClose={() => setShowInvite(false)} />}
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="flex gap-3 px-5 py-4 border-b border-gray-50">
