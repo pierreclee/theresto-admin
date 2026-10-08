@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Copy, Check, Mail, AlertTriangle, UserPlus } from 'lucide-react';
+import { X, Copy, Check, Mail, UserPlus } from 'lucide-react';
 import {
   inviteRestaurantOwnerAction,
   type InviteRestaurantOwnerResult,
@@ -62,16 +62,10 @@ export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
 
         {invitation ? (
           <div className="p-5 space-y-4">
-            {invitation.emailSent ? (
+            {invitation.emailSent && (
               <p className="flex items-start gap-2 text-xs text-green-700 bg-green-50 border border-green-100 rounded-lg px-3 py-2">
                 <Mail size={14} className="shrink-0 mt-0.5" />
                 Invitation envoyée par email à {invitation.email}.
-              </p>
-            ) : (
-              <p className="flex items-start gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                Email non envoyé (staging : seuls @theresto.fr et @test.com reçoivent des emails).
-                Transmettez le lien ci-dessous à {invitation.email}.
               </p>
             )}
 
