@@ -28,6 +28,7 @@ import { FeeConfigModal } from './FeeConfigModal';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
+import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 
 const ESTABLISHMENT_LABELS: Record<string, string> = {
   restaurant: 'Restaurant',
@@ -44,6 +45,7 @@ const ESTABLISHMENT_LABELS: Record<string, string> = {
 
 const approvalConfig = {
   pending: { label: 'En attente', className: 'bg-orange-50 text-orange-700 border-orange-100', icon: Clock },
+  pending_admin_review: { label: 'Revue manuelle', className: 'bg-amber-50 text-amber-700 border-amber-100', icon: Clock },
   approved: { label: 'Approuvé', className: 'bg-green-50 text-green-700 border-green-100', icon: CheckCircle2 },
   rejected: { label: 'Rejeté', className: 'bg-red-50 text-red-700 border-red-100', icon: XCircle },
   suspended: { label: 'Suspendu', className: 'bg-gray-100 text-gray-600 border-gray-200', icon: ShieldOff },
@@ -179,7 +181,7 @@ export function RestaurantDetail({ restaurant }: Props) {
     v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
   const approvalCfg = approvalConfig[(restaurant.approval_status || restaurant.approvalStatus) as ApprovalKey] ?? approvalConfig.pending;
-  const isPending = (restaurant.approval_status || restaurant.approvalStatus) === 'pending';
+  const isPending = TO_REVIEW_STATUSES.includes(String(restaurant.approval_status || restaurant.approvalStatus));
 
   return (
     <>

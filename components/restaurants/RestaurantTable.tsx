@@ -8,6 +8,7 @@ import { SubscriptionModal } from '@/components/restaurants/SubscriptionModal';
 const approvalLabel: Record<string, { label: string; className: string }> = {
   approved: { label: 'Approuvé', className: 'bg-green-50 text-green-700 border-green-100' },
   pending:  { label: 'En attente', className: 'bg-orange-50 text-orange-700 border-orange-100' },
+  pending_admin_review: { label: 'Revue manuelle', className: 'bg-amber-50 text-amber-700 border-amber-100' },
   rejected: { label: 'Rejeté', className: 'bg-red-50 text-red-700 border-red-100' },
   suspended:{ label: 'Suspendu', className: 'bg-gray-100 text-gray-600 border-gray-200' },
 };

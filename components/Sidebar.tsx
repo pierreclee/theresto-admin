@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
+import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import {
   LayoutDashboard,
   Store,
@@ -33,7 +34,7 @@ export function Sidebar() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Fetch pending approvals count
-  const { data: pendingData } = useRestaurants({ status: 'pending' });
+  const { data: pendingData } = useRestaurants({ status: TO_REVIEW_STATUSES });
 
   if (pathname.startsWith('/auth/')) return null;
 

@@ -7,6 +7,7 @@ import type { AuditLog, AuditLogFilter, PlatformStats } from '@/lib/types/audit'
 import type { PlatformConfig, UpdatePlatformConfigInput } from '@/lib/types/config';
 
 import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
+import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 
 export async function getStatsAction(): Promise<PlatformStats> {
   await requireAdmin();
@@ -21,7 +22,7 @@ export async function getStatsAction(): Promise<PlatformStats> {
     { count: activeUsers, error: err4 }
   ] = await Promise.all([
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }),
-    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).in('approval_status', TO_REVIEW_STATUSES),
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'premium'),
     adminDb.from('users').select('*', { count: 'exact', head: true }),
   ]);
@@ -40,7 +41,7 @@ export async function getStatsAction(): Promise<PlatformStats> {
 }
 
 export async function getRestaurantsAction(filters?: {
-  status?: string;
+  status?: string | string[];
   subscription?: string;
   search?: string;
   limit?: number;
@@ -51,7 +52,8 @@ export async function getRestaurantsAction(filters?: {
 
   let query = adminDb.from('restaurants').select('*', { count: 'exact' });
 
-  if (filters?.status) query = query.eq('approval_status', filters.status);
+  if (Array.isArray(filters?.status)) query = query.in('approval_status', filters.status);
+  else if (filters?.status) query = query.eq('approval_status', filters.status);
   if (filters?.subscription) query = query.eq('subscription_plan', filters.subscription);
   if (filters?.search) query = query.ilike('name', `%${filters.search}%`);
 

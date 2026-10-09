@@ -6,6 +6,7 @@ import { useRestaurants } from '@/lib/hooks/useRestaurants';
 import { RestaurantTable } from '@/components/restaurants/RestaurantTable';
 import { InviteRestaurantModal } from '@/components/restaurants/InviteRestaurantModal';
 import { Search, SlidersHorizontal, UserPlus } from 'lucide-react';
+import { LISTED_STATUSES } from '@/lib/constants/approval';
 
 function RestaurantsContent() {
   const router = useRouter();
@@ -16,7 +17,7 @@ function RestaurantsContent() {
 
   const { data, isPending, error } = useRestaurants({
     search: search || undefined,
-    status: status || undefined,
+    status: status || LISTED_STATUSES,
   });
 
   return (
@@ -59,9 +60,7 @@ function RestaurantsContent() {
               className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] bg-white"
             >
               <option value="">Tous les statuts</option>
-              <option value="pending">En attente</option>
               <option value="approved">Approuvés</option>
-              <option value="rejected">Refusés</option>
               <option value="suspended">Suspendus</option>
             </select>
           </div>

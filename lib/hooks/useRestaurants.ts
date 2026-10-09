@@ -5,7 +5,7 @@ import { adminApi } from '@/lib/api/admin';
 import { useToast } from '@/components/shared/Toaster';
 import type { UpdateRestaurantInput } from '@/lib/types/restaurant';
 
-export function useRestaurants(filters?: { status?: string; subscription?: string; search?: string }) {
+export function useRestaurants(filters?: { status?: string | string[]; subscription?: string; search?: string }) {
   return useQuery({
     queryKey: ['restaurants', filters],
     queryFn: () => adminApi.getRestaurants(filters),

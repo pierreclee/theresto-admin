@@ -27,7 +27,7 @@ export interface Restaurant {
   owner_id?: string | null;
   rejection_reason?: string | null;
   rejected_at?: string | null;
-  approval_status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  approval_status: 'pending' | 'pending_admin_review' | 'approved' | 'rejected' | 'suspended';
   subscription_plan: 'free' | 'croissance' | 'liberte' | 'premium';
   is_mollie_connected: boolean;
   commission_rate: number;

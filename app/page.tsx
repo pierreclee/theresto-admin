@@ -211,7 +211,7 @@ export default function DashboardPage() {
               {
                 label: 'Approuver des restaurants',
                 sublabel: `${stats?.pendingApprovals ?? 0} en attente`,
-                href: '/restaurants?status=pending',
+                href: '/approvals',
                 urgent: (stats?.pendingApprovals ?? 0) > 0,
               },
               {
