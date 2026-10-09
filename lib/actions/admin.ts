@@ -21,9 +21,11 @@ export async function getStatsAction(): Promise<PlatformStats> {
     { count: premiumRestaurants, error: err3 },
     { count: activeUsers, error: err4 }
   ] = await Promise.all([
-    adminDb.from('restaurants').select('*', { count: 'exact', head: true }),
+    // Active = approved (pending, refused and suspended ones are not)
+    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('approval_status', 'approved'),
     adminDb.from('restaurants').select('*', { count: 'exact', head: true }).in('approval_status', TO_REVIEW_STATUSES),
-    adminDb.from('restaurants').select('*', { count: 'exact', head: true }).eq('subscription_plan', 'premium'),
+    adminDb.from('restaurants').select('*', { count: 'exact', head: true })
+      .eq('approval_status', 'approved').eq('subscription_plan', 'premium'),
     adminDb.from('users').select('*', { count: 'exact', head: true }),
   ]);
 
