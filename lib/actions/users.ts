@@ -28,8 +28,23 @@ export async function listUsersAction(opts: {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   
-  // Transform to AppUser
-  const users: AppUser[] = (data || []).map(d => ({
+  const users: AppUser[] = (data || []).map(toAppUser);
+
+  const nextCursor = data?.length === PAGE_SIZE ? offset + PAGE_SIZE : null;
+  return { users, cursor: nextCursor };
+}
+
+// One user (restaurant owner link). Null when not found.
+export async function getUserAction(userId: string): Promise<AppUser | null> {
+  await requireAdmin();
+  const adminDb = await getAdminClient();
+  const { data } = await adminDb.from('users').select('*').eq('id', userId).maybeSingle();
+  return data ? toAppUser(data) : null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toAppUser(d: any): AppUser {
+  return {
     id: d.id,
     email: d.email,
     name: d.name,
@@ -44,10 +59,7 @@ export async function listUsersAction(opts: {
     moderatedAt: d.moderated_at ? new Date(d.moderated_at) : undefined,
     createdAt: d.created_at ? new Date(d.created_at) : undefined,
     updatedAt: d.updated_at ? new Date(d.updated_at) : undefined,
-  }));
-  
-  const nextCursor = data?.length === PAGE_SIZE ? offset + PAGE_SIZE : null;
-  return { users, cursor: nextCursor };
+  };
 }
 
 export async function getCrmProfileAction(userId: string): Promise<UserCrmProfile> {

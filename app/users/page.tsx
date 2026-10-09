@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { usersApi } from '@/lib/api/users';
 import { Search, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { ModerationBadge } from '@/components/users/ModerationBadge';
@@ -93,6 +94,15 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
+
+  // /users?user=<id> (e.g. restaurant owner link): open that user's detail
+  useEffect(() => {
+    const userId = new URLSearchParams(window.location.search).get('user');
+    if (!userId) return;
+    usersApi.getUser(userId).then((user) => {
+      if (user) setSelectedUser(user);
+    });
+  }, []);
 
   const { users, isPending, error, hasMore, loadMore } = useUsers({
     statusFilter: statusFilter || undefined,

@@ -24,6 +24,7 @@ import {
   CalendarDays,
   FileText,
   Landmark,
+  UserRound,
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
 import { FeeConfigModal } from './FeeConfigModal';
@@ -32,6 +33,9 @@ import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import { adminApi } from '@/lib/api/admin';
+import { usersApi } from '@/lib/api/users';
+import NextLink from 'next/link';
+import { useQuery } from '@tanstack/react-query';
 
 const ESTABLISHMENT_LABELS: Record<string, string> = {
   restaurant: 'Restaurant',
@@ -177,6 +181,32 @@ interface Props {
   restaurant: Restaurant;
 }
 
+function OwnerRow({ ownerId }: { ownerId: string }) {
+  const { data: owner, isPending } = useQuery({
+    queryKey: ['user', ownerId],
+    queryFn: () => usersApi.getUser(ownerId),
+  });
+  return (
+    <div className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+      <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <UserRound size={13} className="text-gray-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-400 mb-0.5">Propriétaire</p>
+        {isPending ? (
+          <p className="text-sm text-gray-400">Chargement…</p>
+        ) : owner ? (
+          <NextLink href={`/users?user=${ownerId}`} className="text-sm font-medium text-[#FF6B35] hover:underline">
+            {owner.name || owner.email}
+          </NextLink>
+        ) : (
+          <p className="text-sm text-gray-400">Introuvable</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -318,6 +348,7 @@ export function RestaurantDetail({ restaurant }: Props) {
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <SectionHeader title="Coordonnées" />
           <div className="px-5">
+            {restaurant.owner_id && <OwnerRow ownerId={restaurant.owner_id} />}
             <InfoRow icon={Mail} label="Email" value={restaurant.email} />
             <InfoRow icon={Phone} label="Téléphone" value={restaurant.phone_number ?? restaurant.phone ?? ''} />
             <InfoRow icon={MapPin} label="Adresse" value={restaurant.address ?? ''} />
