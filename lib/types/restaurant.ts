@@ -11,6 +11,9 @@ export interface Restaurant {
   name: string;
   email: string;
   phone_number?: string | null;
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
   address?: string | null;
   description?: string | null;
   establishment_type?: string | null;
@@ -61,15 +64,18 @@ export interface Restaurant {
   updatedAt?: string | null;
 }
 
+// Columns of public.restaurants (sent as is to the update)
 export interface UpdateRestaurantInput {
   name?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  description?: string;
-  establishmentType?: string;
-  cuisineTypes?: string[];
-  contact?: RestaurantContact;
+  email?: string | null;
+  phone_number?: string | null;
+  address?: string | null;
+  description?: string | null;
+  establishment_type?: string | null;
+  cuisine_types?: string[];
+  website_url?: string | null;
+  instagram_url?: string | null;
+  facebook_url?: string | null;
 }
 
 export interface RestaurantWithStats extends Restaurant {

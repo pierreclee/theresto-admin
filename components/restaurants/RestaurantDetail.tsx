@@ -181,6 +181,9 @@ export function RestaurantDetail({ restaurant }: Props) {
     v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
 
   const approvalCfg = approvalConfig[(restaurant.approval_status || restaurant.approvalStatus) as ApprovalKey] ?? approvalConfig.pending;
+  const website = restaurant.website_url ?? restaurant.contact?.website ?? '';
+  const instagram = restaurant.instagram_url ?? restaurant.contact?.instagram ?? '';
+  const facebook = restaurant.facebook_url ?? restaurant.contact?.facebook ?? '';
   const isPending = TO_REVIEW_STATUSES.includes(String(restaurant.approval_status || restaurant.approvalStatus));
 
   return (
@@ -194,7 +197,7 @@ export function RestaurantDetail({ restaurant }: Props) {
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-orange-800">Restaurant en attente de validation</p>
               <p className="text-xs text-orange-600 mt-0.5">
-                Vérifiez les informations ci-dessous avant d'approuver ou rejeter ce restaurant.
+                Vérifiez les informations ci-dessous avant d’approuver ou rejeter ce restaurant.
               </p>
             </div>
             <button
@@ -271,36 +274,23 @@ export function RestaurantDetail({ restaurant }: Props) {
             <InfoRow icon={Mail} label="Email" value={restaurant.email} />
             <InfoRow icon={Phone} label="Téléphone" value={restaurant.phone_number ?? restaurant.phone ?? ''} />
             <InfoRow icon={MapPin} label="Adresse" value={restaurant.address ?? ''} />
-            {restaurant.contact?.website && (
-              <InfoRow
-                icon={Globe}
-                label="Site web"
-                value={restaurant.contact.website}
-                href={restaurant.contact.website}
-              />
+            {website && (
+              <InfoRow icon={Globe} label="Site web" value={website} href={website} />
             )}
-            {restaurant.contact?.instagram && (
+            {instagram && (
               <InfoRow
                 icon={AtSign}
                 label="Instagram"
-                value={restaurant.contact.instagram}
-                href={
-                  restaurant.contact.instagram.startsWith('http')
-                    ? restaurant.contact.instagram
-                    : `https://instagram.com/${restaurant.contact.instagram.replace('@', '')}`
-                }
+                value={instagram}
+                href={instagram.startsWith('http') ? instagram : `https://instagram.com/${instagram.replace('@', '')}`}
               />
             )}
-            {restaurant.contact?.facebook && (
+            {facebook && (
               <InfoRow
                 icon={Link}
                 label="Facebook"
-                value={restaurant.contact.facebook}
-                href={
-                  restaurant.contact.facebook.startsWith('http')
-                    ? restaurant.contact.facebook
-                    : `https://facebook.com/${restaurant.contact.facebook}`
-                }
+                value={facebook}
+                href={facebook.startsWith('http') ? facebook : `https://facebook.com/${facebook}`}
               />
             )}
           </div>

@@ -56,9 +56,9 @@ export function EditRestaurantModal({ restaurant, onClose }: Props) {
     email: restaurant.email || restaurant.contact?.email || '',
     phone: (restaurant.phone_number || restaurant.phone || restaurant.contact?.phone) || '',
     address: restaurant.address || '',
-    website: restaurant.contact?.website || '',
-    instagram: restaurant.contact?.instagram || '',
-    facebook: restaurant.contact?.facebook || '',
+    website: restaurant.website_url || restaurant.contact?.website || '',
+    instagram: restaurant.instagram_url || restaurant.contact?.instagram || '',
+    facebook: restaurant.facebook_url || restaurant.contact?.facebook || '',
     cuisineTypes: ((restaurant.cuisine_types ?? restaurant.cuisineTypes) ?? []).join(', '),
   });
 
@@ -76,21 +76,17 @@ export function EditRestaurantModal({ restaurant, onClose }: Props) {
         restaurantId: restaurant.id,
         updates: {
           name: form.name.trim(),
-          email: form.email.trim() || undefined,
-          phone: form.phone.trim() || undefined,
-          address: form.address.trim() || undefined,
-          description: form.description.trim() || undefined,
-          establishmentType: form.establishmentType || undefined,
-          cuisineTypes: form.cuisineTypes
+          email: form.email.trim() || null,
+          phone_number: form.phone.trim() || null,
+          address: form.address.trim() || null,
+          description: form.description.trim() || null,
+          establishment_type: form.establishmentType || null,
+          cuisine_types: form.cuisineTypes
             ? form.cuisineTypes.split(',').map((s) => s.trim()).filter(Boolean)
-            : undefined,
-          contact: {
-            phone: form.phone.trim() || null,
-            email: form.email.trim() || null,
-            website: form.website.trim() || null,
-            instagram: form.instagram.trim() || null,
-            facebook: form.facebook.trim() || null,
-          },
+            : [],
+          website_url: form.website.trim() || null,
+          instagram_url: form.instagram.trim() || null,
+          facebook_url: form.facebook.trim() || null,
         },
       });
       onClose();
