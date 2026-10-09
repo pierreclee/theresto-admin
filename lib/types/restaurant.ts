@@ -30,6 +30,9 @@ export interface Restaurant {
   owner_id?: string | null;
   rejection_reason?: string | null;
   rejected_at?: string | null;
+  siren?: string | null;
+  company_name_from_inpi?: string | null;
+  kbis_path?: string | null;
   approval_status: 'pending' | 'pending_admin_review' | 'approved' | 'rejected' | 'suspended';
   subscription_plan: 'free' | 'croissance' | 'liberte' | 'premium';
   is_mollie_connected: boolean;

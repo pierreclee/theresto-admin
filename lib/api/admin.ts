@@ -5,6 +5,7 @@ export const adminApi = {
   getRestaurants: actions.getRestaurantsAction,
   getRestaurantDetail: actions.getRestaurantDetailAction,
   updateRestaurant: actions.updateRestaurantAction,
+  getKbisUrl: actions.getKbisUrlAction,
   setAdminFee: actions.setAdminFeeAction,
   approveRestaurant: actions.approveRestaurantAction,
   updateSubscriptionPlan: actions.updateSubscriptionPlanAction,

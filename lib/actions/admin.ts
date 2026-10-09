@@ -77,6 +77,33 @@ export async function getRestaurantDetailAction(restaurantId: string): Promise<R
   return data as any;
 }
 
+// Signed URL (5 min) to the Kbis, stored in the private onboarding-docs
+// bucket. Returns the error instead of throwing (production masks messages).
+export async function getKbisUrlAction(
+  restaurantId: string,
+): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  await requireAdmin();
+  const adminDb = await getAdminClient();
+
+  const { data, error } = await adminDb
+    .from('restaurants')
+    .select('kbis_path')
+    .eq('id', restaurantId)
+    .single();
+  if (error) return { ok: false, error: error.message };
+
+  const path: string | null = data?.kbis_path ?? null;
+  if (!path) return { ok: false, error: 'Aucun Kbis déposé' };
+  // Former uploads were public URLs
+  if (path.startsWith('http')) return { ok: true, url: path };
+
+  const { data: signed, error: signError } = await adminDb.storage
+    .from('onboarding-docs')
+    .createSignedUrl(path, 300);
+  if (signError || !signed) return { ok: false, error: signError?.message ?? 'Lien indisponible' };
+  return { ok: true, url: signed.signedUrl };
+}
+
 export async function updateRestaurantAction(restaurantId: string, updates: UpdateRestaurantInput): Promise<Restaurant> {
   await requireAdmin();
   const adminDb = await getAdminClient();

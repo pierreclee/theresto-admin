@@ -22,6 +22,8 @@ import {
   LocateFixed,
   User,
   CalendarDays,
+  FileText,
+  Landmark,
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
 import { FeeConfigModal } from './FeeConfigModal';
@@ -29,6 +31,7 @@ import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
+import { adminApi } from '@/lib/api/admin';
 
 const ESTABLISHMENT_LABELS: Record<string, string> = {
   restaurant: 'Restaurant',
@@ -174,6 +177,50 @@ interface Props {
   restaurant: Restaurant;
 }
 
+function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boolean }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const open = async () => {
+    setLoading(true);
+    setError('');
+    // Opened before the await: browsers block popups opened after it
+    const tab = window.open('', '_blank');
+    const result = await adminApi.getKbisUrl(restaurantId);
+    setLoading(false);
+    if (result.ok) {
+      if (tab) tab.location.href = result.url;
+      else window.open(result.url, '_blank', 'noopener');
+    } else {
+      tab?.close();
+      setError(result.error);
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-3 py-3 border-b border-gray-50 last:border-0">
+      <div className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <FileText size={13} className="text-gray-500" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-gray-400 mb-0.5">Extrait Kbis</p>
+        {hasKbis ? (
+          <button
+            onClick={open}
+            disabled={loading}
+            className="text-sm font-medium text-[#FF6B35] hover:underline disabled:opacity-50"
+          >
+            {loading ? 'Ouverture…' : 'Voir le Kbis'}
+          </button>
+        ) : (
+          <p className="text-sm text-gray-400">Non fourni</p>
+        )}
+        {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
+      </div>
+    </div>
+  );
+}
+
 export function RestaurantDetail({ restaurant }: Props) {
   const [modal, setModal] = useState<'fee' | 'subscription' | 'approval' | 'edit' | null>(null);
 
@@ -293,6 +340,24 @@ export function RestaurantDetail({ restaurant }: Props) {
                 href={facebook.startsWith('http') ? facebook : `https://facebook.com/${facebook}`}
               />
             )}
+          </div>
+        </div>
+
+        {/* Identité légale */}
+        <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+          <SectionHeader title="Identité légale" />
+          <div className="px-5">
+            <InfoRow
+              icon={Landmark}
+              label="SIREN"
+              value={restaurant.siren ?? ''}
+              href={restaurant.siren ? `https://annuaire-entreprises.data.gouv.fr/entreprise/${restaurant.siren}` : undefined}
+              mono
+            />
+            {restaurant.company_name_from_inpi && (
+              <InfoRow icon={Landmark} label="Raison sociale (Sirene)" value={restaurant.company_name_from_inpi} />
+            )}
+            <KbisRow restaurantId={restaurant.id} hasKbis={!!restaurant.kbis_path} />
           </div>
         </div>
 
