@@ -56,7 +56,7 @@ export function useApproveRestaurant() {
   const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       status,
       reason,
@@ -66,14 +66,18 @@ export function useApproveRestaurant() {
       status: 'approved' | 'rejected' | 'suspended';
       reason?: string;
       correctionMode?: 'correction_required' | 'permanent';
-    }) => adminApi.approveRestaurant(restaurantId, status, reason, correctionMode),
+    }) => {
+      const result = await adminApi.approveRestaurant(restaurantId, status, reason, correctionMode);
+      if (!result.ok) throw new Error(result.error);
+      return result;
+    },
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['platformStats'] });
       toast('Statut du restaurant mis à jour');
     },
-    onError: () => toast('Erreur lors de la mise à jour du statut', 'error'),
+    onError: (error) => toast(`Erreur lors de la mise à jour du statut : ${error.message}`, 'error'),
   });
 }
 

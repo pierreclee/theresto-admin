@@ -6,7 +6,8 @@ import type { Restaurant, UpdateRestaurantInput } from '@/lib/types/restaurant';
 import type { AuditLog, AuditLogFilter, PlatformStats } from '@/lib/types/audit';
 import type { PlatformConfig, UpdatePlatformConfigInput } from '@/lib/types/config';
 
-import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
+import { FunctionsHttpError } from '@supabase/supabase-js';
+import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/server';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 
 export async function getStatsAction(): Promise<PlatformStats> {
@@ -122,76 +123,41 @@ export async function setAdminFeeAction(restaurantId: string, feePercent: number
   return { success: true };
 }
 
+// Approval and refusal go through the admin-onboarding Edge Function (status
+// update + owner email), with the admin's own session: the function checks
+// the admin claim. Suspension is a plain status update.
+// Errors are returned, not thrown: production hides thrown messages.
 export async function approveRestaurantAction(
   restaurantId: string,
   status: 'approved' | 'rejected' | 'suspended',
   reason?: string,
   correctionMode?: 'correction_required' | 'permanent'
-): Promise<{ success: boolean }> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   await requireAdmin();
-  const adminDb = await getAdminClient();
 
-  const payload: any = { approval_status: status };
-
-  if (status === 'rejected') {
-    if (reason) payload.rejection_reason = reason;
-    if (correctionMode) payload.correction_mode = correctionMode;
-    payload.rejected_at = new Date().toISOString();
-  } else if (status === 'approved') {
-    payload.approved_at = new Date().toISOString();
+  if (status === 'suspended') {
+    const adminDb = await getAdminClient();
+    const { error } = await adminDb.from('restaurants')
+      .update({ approval_status: 'suspended', updated_at: new Date().toISOString() })
+      .eq('id', restaurantId);
+    return error ? { ok: false, error: error.message } : { ok: true };
   }
 
-  const { error } = await adminDb.from('restaurants').update(payload).eq('id', restaurantId);
-  if (error) throw new Error(error.message);
-
-  // Send notification email via Edge Function
-  const edgeFunctionUrl = process.env.SUPABASE_URL + '/functions/v1/admin-onboarding';
-  const supabaseKey = process.env.SUPABASE_ANON_KEY;
-
-  if (status === 'approved') {
-    await fetch(edgeFunctionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({
-        action: 'approveOnboardingRestaurant',
-        restaurantId,
-      }),
-    }).catch(err => console.error('Email notification failed:', err));
-  } else if (status === 'rejected') {
-    const { data: restaurant } = await adminDb.from('restaurants')
-      .select('name, owner_id').eq('id', restaurantId).single();
-
-    if (restaurant?.owner_id) {
-      const { data: owner } = await adminDb.from('users')
-        .select('email, display_name').eq('id', restaurant.owner_id).single();
-
-      if (owner?.email) {
-        // Send rejection email
-        await fetch(process.env.SUPABASE_URL + '/functions/v1/send-email', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseKey}`,
-          },
-          body: JSON.stringify({
-            to: owner.email,
-            subject: 'Votre restaurant — Décision d\'approbation',
-            template: 'RESTAURANT_REJECTED',
-            variables: {
-              RESTAURANT_NAME: restaurant.name ?? '',
-              REJECTION_REASON: reason ?? 'N/A',
-              CORRECTION_MODE: correctionMode ?? '',
-            },
-          }),
-        }).catch(err => console.error('Rejection email failed:', err));
-      }
+  const supabase = await createClient();
+  const { error } = await supabase.functions.invoke('admin-onboarding', {
+    body: status === 'approved'
+      ? { action: 'approveOnboardingRestaurant', restaurantId }
+      : { action: 'rejectOnboardingRestaurant', restaurantId, reason, correctionMode },
+  });
+  if (error) {
+    let message = error.message;
+    if (error instanceof FunctionsHttpError) {
+      const body = await error.context.json().catch(() => null);
+      message = body?.error?.message ?? message;
     }
+    return { ok: false, error: message };
   }
-
-  return { success: true };
+  return { ok: true };
 }
 
 export async function updateSubscriptionPlanAction(
