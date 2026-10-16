@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { X, Check } from 'lucide-react';
 import { useUpdateSubscription } from '@/lib/hooks/useRestaurants';
+import { formatPlanPrice, useSubscriptionPrices } from '@/lib/hooks/useSubscriptionPrices';
 
 type Plan = 'free' | 'croissance' | 'liberte' | 'premium';
 
-const PLANS: { key: Plan; label: string; price?: string; badgeClass: string; cardClass: string; ringClass: string; features: string[] }[] = [
+const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; ringClass: string; features: string[] }[] = [
   {
     key: 'free',
     label: 'Essentiel',
@@ -18,7 +19,6 @@ const PLANS: { key: Plan; label: string; price?: string; badgeClass: string; car
   {
     key: 'croissance',
     label: 'Croissance',
-    price: '129 € / mois',
     badgeClass: 'bg-blue-50 text-blue-700 border-blue-200',
     cardClass: 'border-blue-200 bg-blue-50',
     ringClass: 'ring-blue-400',
@@ -31,7 +31,6 @@ const PLANS: { key: Plan; label: string; price?: string; badgeClass: string; car
   {
     key: 'liberte',
     label: 'Liberté',
-    price: '149 € / mois',
     badgeClass: 'bg-purple-50 text-purple-700 border-purple-200',
     cardClass: 'border-purple-200 bg-purple-50',
     ringClass: 'ring-purple-400',
@@ -57,6 +56,12 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
   const [targetPlan, setTargetPlan] = useState<Plan | null>(null);
   const [error, setError] = useState('');
   const { mutateAsync, isPending } = useUpdateSubscription();
+  // Prix courants depuis Stripe
+  const { data: prices } = useSubscriptionPrices();
+  const priceLabel = (plan: Plan) => {
+    const price = prices?.find((p) => p.plan === plan);
+    return price ? `${formatPlanPrice(price)} / mois` : null;
+  };
 
   const handleConfirm = async () => {
     if (!targetPlan) return;
@@ -78,7 +83,7 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-sm font-semibold text-gray-900">Modifier l'abonnement</h3>
+          <h3 className="text-sm font-semibold text-gray-900">Modifier l&apos;abonnement</h3>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors">
             <X size={15} />
           </button>
@@ -118,8 +123,8 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
                   <span className={`px-2 py-0.5 rounded-full border ${plan.badgeClass}`}>
                     {plan.label}
                   </span>
-                  {plan.price && (
-                    <span className="text-[10px] text-gray-400">{plan.price}</span>
+                  {priceLabel(plan.key) && (
+                    <span className="text-[10px] text-gray-400">{priceLabel(plan.key)}</span>
                   )}
                 </button>
               );

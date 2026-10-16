@@ -13,6 +13,7 @@ import {
   Power,
 } from 'lucide-react';
 import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
+import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
 
 // ─── Editable number field ───────────────────────────────────────────────────
 
@@ -311,6 +312,9 @@ export default function ConfigPage() {
           </div>
         )}
       </div>
+
+      {/* Subscription prices (Stripe) */}
+      <SubscriptionPricesCard />
 
       {/* Operations */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
