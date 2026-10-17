@@ -1,7 +1,6 @@
-import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
-
 'use client';
 
+import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 import { useState } from 'react';
 import { X, Check } from 'lucide-react';
 import { useUpdateSubscription } from '@/lib/hooks/useRestaurants';

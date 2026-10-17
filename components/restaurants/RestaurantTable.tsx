@@ -1,7 +1,6 @@
-import { normalizeSubscriptionPlan } from '@/lib/utils/subscriptionPlan';
-
 'use client';
 
+import { normalizeSubscriptionPlan } from '@/lib/utils/subscriptionPlan';
 import { useState } from 'react';
 import { Restaurant } from '@/lib/types/restaurant';
 import { Table } from '@/components/shared/Table';
