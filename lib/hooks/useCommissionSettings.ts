@@ -10,6 +10,7 @@ import {
 } from '@/lib/actions/commissionSettings';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
+import { COMMISSION_CONFLICT_MESSAGE, CommissionMutationError } from '@/lib/utils/commissionRates';
 
 /** Le tarif est modifié mais l'écriture dans platform_logs a échoué (auditLogged=false). */
 const AUDIT_NOT_LOGGED_MESSAGE =
@@ -24,7 +25,7 @@ function commissionErrorMessage(code: string | undefined, error: string): string
     return 'Vérification en deux étapes expirée ou droits insuffisants. Saisissez un nouveau code.';
   }
   if (code === 'failed-precondition') {
-    return 'Le tarif a été modifié entre-temps. Rechargez la page et recommencez.';
+    return COMMISSION_CONFLICT_MESSAGE;
   }
   if (code === 'invalid-argument') {
     return 'Montants invalides.';
@@ -81,7 +82,9 @@ export function useRestaurantCommission(restaurantId: string) {
 }
 
 // Les requêtes sont invalidées même en cas d'erreur (onSettled) : un conflit
-// de concurrence signifie que les données affichées sont périmées.
+// de concurrence signifie que les données affichées sont périmées. onSettled
+// renvoie la promesse du rechargement, que mutateAsync attend avant de rendre
+// la main : après un conflit, le formulaire repart des valeurs à jour.
 
 export function useUpdateGlobalCommissionRates() {
   const toast = useToast();
@@ -100,17 +103,20 @@ export function useUpdateGlobalCommissionRates() {
     }) => {
       await verifyTotpCode(totpCode);
       const result = await updateGlobalCommissionRatesAction(input);
-      if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
       return result.data;
     },
     onSuccess: ({ auditLogged }) => {
       if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
       else toast('Tarif des commissions mis à jour');
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['commissionSettings'] });
-      queryClient.invalidateQueries({ queryKey: ['restaurantCommission'] });
-    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['commissionSettings'] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurantCommission'] }),
+      ]),
   });
 }
 
@@ -129,16 +135,16 @@ export function useUpdateRestaurantCommissionRates(restaurantId: string) {
     }) => {
       await verifyTotpCode(totpCode);
       const result = await updateRestaurantCommissionRatesAction({ restaurantId, ...input });
-      if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
       return result.data;
     },
     onSuccess: ({ auditLogged }) => {
       if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
       else toast('Tarif personnalisé enregistré');
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] });
-    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
   });
 }
 
@@ -149,15 +155,15 @@ export function useResetRestaurantCommissionRates(restaurantId: string) {
     mutationFn: async ({ totpCode, expectedUpdatedAt }: { totpCode: string; expectedUpdatedAt: string | null }) => {
       await verifyTotpCode(totpCode);
       const result = await resetRestaurantCommissionRatesAction({ restaurantId, expectedUpdatedAt });
-      if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
       return result.data;
     },
     onSuccess: ({ auditLogged }) => {
       if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
       else toast('Le restaurant suit de nouveau le tarif global');
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] });
-    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
   });
 }

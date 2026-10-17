@@ -1,6 +1,7 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
+import { COMMISSION_CONFLICT_MESSAGE, CommissionMutationError } from '@/lib/utils/commissionRates';
 
 const mutateAsync = jest.fn();
 
@@ -13,6 +14,13 @@ const loadedQuery = {
   error: null as Error | null,
 };
 let mockQuery = loadedQuery;
+
+function submitGuestFee(value: string) {
+  fireEvent.change(screen.getByLabelText('Par couvert'), { target: { value } });
+  fireEvent.click(screen.getByText('Continuer'));
+  fireEvent.change(screen.getByLabelText(/Code de votre application/), { target: { value: '123456' } });
+  fireEvent.click(screen.getByText('Confirmer le nouveau tarif'));
+}
 
 jest.mock('@/lib/hooks/useCommissionSettings', () => ({
   useCommissionSettings: () => mockQuery,
@@ -70,7 +78,7 @@ describe('CommissionRatesCard', () => {
     fireEvent.change(screen.getByLabelText(/Code de votre application/), { target: { value: '123456' } });
     fireEvent.click(screen.getByText('Confirmer le nouveau tarif'));
 
-    await screen.findByText('Commissions plan Essentiel');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(mutateAsync).toHaveBeenCalledWith({
       tableFeeHt: 1,
       guestFeeHt: 0.3,
@@ -92,5 +100,39 @@ describe('CommissionRatesCard', () => {
 
     expect(await screen.findByText('Code de vérification invalide')).toBeInTheDocument();
     expect(screen.getByLabelText(/Code de votre application/)).toHaveValue('');
+    expect(screen.getByLabelText(/Code de votre application/)).toHaveFocus();
+  });
+
+  it('après un conflit, revient au formulaire avec les valeurs à jour', async () => {
+    mutateAsync.mockRejectedValueOnce(new CommissionMutationError(COMMISSION_CONFLICT_MESSAGE, 'failed-precondition'));
+    const { rerender } = render(<CommissionRatesCard />);
+    fireEvent.click(screen.getByText('Modifier'));
+    submitGuestFee('0,30');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(COMMISSION_CONFLICT_MESSAGE);
+    expect(screen.getByLabelText('Par couvert')).toHaveValue('0,25');
+
+    // Le rechargement apporte le tarif modifié par un autre admin.
+    mockQuery = {
+      ...loadedQuery,
+      data: {
+        ...loadedQuery.data,
+        settings: { ...loadedQuery.data.settings, tableFeeHt: 1.5, updatedAt: '2026-10-16T10:30:00Z' },
+      },
+    };
+    rerender(<CommissionRatesCard />);
+    expect(screen.getByLabelText('Par table réservée')).toHaveValue('1,5');
+
+    mutateAsync.mockResolvedValueOnce({ updatedAt: '2026-10-16T11:00:00Z', auditLogged: true });
+    submitGuestFee('0,30');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mutateAsync).toHaveBeenLastCalledWith({
+      tableFeeHt: 1.5,
+      guestFeeHt: 0.3,
+      minInvoiceHt: 5,
+      maxCarryMonths: 3,
+      expectedUpdatedAt: '2026-10-16T10:30:00Z',
+      totpCode: '123456',
+    });
   });
 });

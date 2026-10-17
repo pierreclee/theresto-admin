@@ -54,3 +54,21 @@ export const INVOICE_STATUS_LABELS: Record<CommissionInvoiceStatus, string> = {
   uncollectible: 'Impayée',
   void: 'Annulée',
 };
+
+/** Message d'un conflit de concurrence : le tarif a changé depuis l'ouverture du formulaire. */
+export const COMMISSION_CONFLICT_MESSAGE = 'Le tarif a été modifié entre-temps : vérifiez les nouvelles valeurs.';
+
+/** Erreur d'une modification de tarif, avec le code de l'Edge Function (ex. 'failed-precondition'). */
+export class CommissionMutationError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = 'CommissionMutationError';
+  }
+
+  get isConflict(): boolean {
+    return this.code === 'failed-precondition';
+  }
+}

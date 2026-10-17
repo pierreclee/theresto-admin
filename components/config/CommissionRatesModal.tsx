@@ -3,7 +3,12 @@
 import { useState } from 'react';
 import { AlertTriangle, ArrowRight, X } from 'lucide-react';
 import { TotpCodeField } from '@/components/shared/TotpCodeField';
-import { formatEuro, parseEuroInput, parseMonthsInput } from '@/lib/utils/commissionRates';
+import {
+  CommissionMutationError,
+  formatEuro,
+  parseEuroInput,
+  parseMonthsInput,
+} from '@/lib/utils/commissionRates';
 
 export interface CommissionRateField {
   key: string;
@@ -12,6 +17,14 @@ export interface CommissionRateField {
   kind: 'euro' | 'months';
   /** Maximum pour un montant (défaut 100 €). */
   max?: number;
+}
+
+function seedDrafts(fields: CommissionRateField[]): Record<string, string> {
+  return Object.fromEntries(fields.map((f) => [f.key, f.initial.toString().replace('.', ',')]));
+}
+
+function initialsKeyOf(fields: CommissionRateField[]): string {
+  return fields.map((f) => `${f.key}=${f.initial}`).join('&');
 }
 
 function formatFieldValue(field: CommissionRateField, value: number): string {
@@ -23,12 +36,20 @@ function formatFieldValue(field: CommissionRateField, value: number): string {
  * Sans champ ([fields] vide), seule l'étape de confirmation est affichée.
  * [onConfirm] lève une Error dont le message (déjà en français) est affiché ;
  * les toasts de succès sont gérés par les hooks de mutation.
+ *
+ * Conflit de concurrence (CommissionMutationError 'failed-precondition') : retour
+ * au formulaire, ressaisi depuis les valeurs à jour ([fields] rechargés), pour ne
+ * jamais renvoyer des valeurs saisies sur des données périmées.
+ *
+ * [unchangedConfirmation] autorise à valider des valeurs identiques aux valeurs
+ * actuelles (ex. figer le tarif global comme tarif personnalisé).
  */
 export function CommissionRatesModal({
   title,
   fields,
   warning,
   confirmLabel,
+  unchangedConfirmation,
   onConfirm,
   onClose,
 }: {
@@ -36,14 +57,21 @@ export function CommissionRatesModal({
   fields: CommissionRateField[];
   warning: string;
   confirmLabel: string;
+  unchangedConfirmation?: { notice: string; confirmLabel: string };
   onConfirm: (values: Record<string, number>, totpCode: string) => Promise<void>;
   onClose: () => void;
 }) {
   const hasForm = fields.length > 0;
   const [step, setStep] = useState<'form' | 'confirm'>(hasForm ? 'form' : 'confirm');
-  const [drafts, setDrafts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((f) => [f.key, f.initial.toString().replace('.', ',')])),
-  );
+  const [drafts, setDrafts] = useState<Record<string, string>>(() => seedDrafts(fields));
+  // Après un conflit : clé des valeurs initiales périmées. Dès que [fields]
+  // arrive rechargé (clé différente), le formulaire est ressaisi.
+  const [staleInitialsKey, setStaleInitialsKey] = useState<string | null>(null);
+  const initialsKey = initialsKeyOf(fields);
+  if (staleInitialsKey !== null && staleInitialsKey !== initialsKey) {
+    setStaleInitialsKey(null);
+    setDrafts(seedDrafts(fields));
+  }
   const [values, setValues] = useState<Record<string, number>>({});
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -64,11 +92,12 @@ export function CommissionRatesModal({
       }
       parsed[field.key] = value;
     }
-    if (fields.every((f) => parsed[f.key] === f.initial)) {
+    if (!unchangedConfirmation && fields.every((f) => parsed[f.key] === f.initial)) {
       setError('Aucune valeur modifiée');
       return;
     }
     setError('');
+    setStaleInitialsKey(null);
     setValues(parsed);
     setStep('confirm');
   };
@@ -82,12 +111,19 @@ export function CommissionRatesModal({
     } catch (e) {
       setCode('');
       setError(e instanceof Error ? e.message : 'Erreur lors de la mise à jour du tarif');
+      if (e instanceof CommissionMutationError && e.isConflict && hasForm) {
+        setValues({});
+        setDrafts(seedDrafts(fields));
+        setStaleInitialsKey(initialsKey);
+        setStep('form');
+      }
     } finally {
       setPending(false);
     }
   };
 
   const changedFields = fields.filter((f) => values[f.key] !== undefined && values[f.key] !== f.initial);
+  const isUnchanged = hasForm && changedFields.length === 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -106,7 +142,7 @@ export function CommissionRatesModal({
           <button
             onClick={onClose}
             disabled={pending}
-            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors"
+            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             aria-label="Fermer"
           >
             <X size={15} />
@@ -153,7 +189,12 @@ export function CommissionRatesModal({
                   ))}
                 </ul>
               )}
-              <TotpCodeField value={code} onChange={setCode} onSubmit={handleConfirm} disabled={pending} />
+              {isUnchanged && unchangedConfirmation && (
+                <p className="py-3 px-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700">
+                  {unchangedConfirmation.notice}
+                </p>
+              )}
+              <TotpCodeField value={code} onChange={setCode} onSubmit={handleConfirm} busy={pending} />
             </>
           )}
 
@@ -163,7 +204,7 @@ export function CommissionRatesModal({
           </div>
 
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+            <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
           )}
 
           <div className="flex gap-2 pt-1">
@@ -195,7 +236,11 @@ export function CommissionRatesModal({
                 disabled={code.length !== 6 || pending}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-[#FF6B35] hover:bg-[#e85d2a] rounded-xl transition-colors disabled:opacity-40"
               >
-                {pending ? 'Mise à jour…' : confirmLabel}
+                {pending
+                  ? 'Mise à jour…'
+                  : isUnchanged && unchangedConfirmation
+                    ? unchangedConfirmation.confirmLabel
+                    : confirmLabel}
               </button>
             )}
           </div>

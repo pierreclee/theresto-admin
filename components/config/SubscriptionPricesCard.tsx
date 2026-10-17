@@ -134,7 +134,7 @@ function EditPriceModal({ price, onClose }: { price: SubscriptionPriceInfo; onCl
               value={code}
               onChange={setCode}
               onSubmit={handleConfirm}
-              disabled={isPending}
+              busy={isPending}
               hint="Requis pour toute modification de prix, même si vous êtes déjà connecté."
             />
 

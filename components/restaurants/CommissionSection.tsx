@@ -102,7 +102,7 @@ export function CommissionSection({ restaurantId }: { restaurantId: string }) {
                     <td className="py-1.5 text-right">{invoice.bookingCount}</td>
                     <td className="py-1.5 text-right">{formatEuro(invoice.amountHt)}</td>
                     <td className="py-1.5 text-right">
-                      {invoice.hostedInvoiceUrl ? (
+                      {invoice.hostedInvoiceUrl?.startsWith('https://') ? (
                         <a
                           href={invoice.hostedInvoiceUrl}
                           target="_blank"
@@ -133,6 +133,14 @@ export function CommissionSection({ restaurantId }: { restaurantId: string }) {
           ]}
           warning="Remplace le tarif global pour ce restaurant, à partir des réservations comptabilisées dès maintenant."
           confirmLabel="Enregistrer le tarif"
+          unchangedConfirmation={
+            commission.isCustom
+              ? undefined
+              : {
+                  notice: 'Tarif figé pour ce restaurant : il ne suivra plus les changements du tarif global.',
+                  confirmLabel: 'Figer le tarif',
+                }
+          }
           onConfirm={async (values, totpCode) => {
             await update.mutateAsync({
               tableFeeHt: values.tableFeeHt,
