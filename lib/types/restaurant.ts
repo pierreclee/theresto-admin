@@ -1,3 +1,5 @@
+import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
+
 export interface RestaurantContact {
   phone?: string | null;
   email?: string | null;
@@ -34,7 +36,8 @@ export interface Restaurant {
   company_name_from_inpi?: string | null;
   kbis_path?: string | null;
   approval_status: 'pending' | 'pending_admin_review' | 'approved' | 'rejected' | 'suspended';
-  subscription_plan: 'free' | 'croissance' | 'liberte' | 'premium';
+  /** 'free' peut encore être lu sur des lignes héritées ; il compte comme Essentiel. */
+  subscription_plan: SubscriptionPlanKey | 'free';
   is_mollie_connected: boolean;
   commission_rate: number;
   total_revenue?: number | null;

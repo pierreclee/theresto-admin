@@ -5,7 +5,7 @@ import {
   getSubscriptionPricesAction,
   updateSubscriptionPriceAction,
 } from '@/lib/actions/subscriptionPrices';
-import { createClient } from '@/lib/supabase/client';
+import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
 import type { PaidPlan, SubscriptionPriceInfo } from '@/lib/types/config';
 
@@ -68,17 +68,7 @@ export function useUpdateSubscriptionPrice() {
       expectedPriceId: string;
       totpCode: string;
     }) => {
-      const supabase = createClient();
-      const { data: factors, error: factorsError } = await supabase.auth.mfa.listFactors();
-      if (factorsError) throw new Error(factorsError.message);
-      const totp = factors?.totp?.find((f) => f.status === 'verified');
-      if (!totp) throw new Error('Aucune application d\'authentification configurée pour ce compte');
-
-      const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
-        factorId: totp.id,
-        code: totpCode,
-      });
-      if (verifyError) throw new Error('Code de vérification invalide');
+      await verifyTotpCode(totpCode);
 
       const result = await updateSubscriptionPriceAction(plan, amount, expectedPriceId);
       if (!result.ok) throw new Error(priceUpdateErrorMessage(result.code, result.error));

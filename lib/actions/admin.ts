@@ -9,6 +9,7 @@ import type { PlatformConfig, UpdatePlatformConfigInput } from '@/lib/types/conf
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/server';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
+import { normalizeSubscriptionPlan, type SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 
 export async function getStatsAction(): Promise<PlatformStats> {
   await requireAdmin();
@@ -57,7 +58,11 @@ export async function getRestaurantsAction(filters?: {
 
   if (Array.isArray(filters?.status)) query = query.in('approval_status', filters.status);
   else if (filters?.status) query = query.eq('approval_status', filters.status);
-  if (filters?.subscription) query = query.eq('subscription_plan', filters.subscription);
+  if (filters?.subscription) {
+    const plan = normalizeSubscriptionPlan(filters.subscription);
+    // Les lignes héritées peuvent encore porter 'free' : elles comptent comme Essentiel.
+    query = plan === 'essentiel' ? query.in('subscription_plan', ['essentiel', 'free']) : query.eq('subscription_plan', plan);
+  }
   if (filters?.search) query = query.ilike('name', `%${filters.search}%`);
 
   if (filters?.limit) {
@@ -162,7 +167,7 @@ export async function approveRestaurantAction(
 
 export async function updateSubscriptionPlanAction(
   restaurantId: string,
-  plan: 'free' | 'croissance' | 'liberte' | 'premium'
+  plan: SubscriptionPlanKey
 ): Promise<{ success: boolean }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
