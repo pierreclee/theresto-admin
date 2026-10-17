@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { AlertTriangle, ArrowRight, CreditCard, Pencil, ShieldCheck, X } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CreditCard, Pencil, X } from 'lucide-react';
+import { TotpCodeField } from '@/components/shared/TotpCodeField';
 import {
   PLAN_LABELS,
   formatPlanPrice,
@@ -129,29 +130,13 @@ function EditPriceModal({ price, onClose }: { price: SubscriptionPriceInfo; onCl
               <span className="text-xs text-gray-400">/ mois HT</span>
             </div>
 
-            <div>
-              <label htmlFor="totp-code" className="flex items-center gap-1.5 text-xs font-medium text-gray-600 mb-1.5">
-                <ShieldCheck size={13} className="text-[#FF6B35]" />
-                Code de votre application d&apos;authentification
-              </label>
-              <input
-                id="totp-code"
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={(e) => e.key === 'Enter' && code.length === 6 && !isPending && handleConfirm()}
-                autoFocus
-                disabled={isPending}
-                placeholder="000000"
-                className="w-full text-center text-2xl tracking-[0.4em] font-mono border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/20 disabled:opacity-60"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                Requis pour toute modification de prix, même si vous êtes déjà connecté.
-              </p>
-            </div>
+            <TotpCodeField
+              value={code}
+              onChange={setCode}
+              onSubmit={handleConfirm}
+              disabled={isPending}
+              hint="Requis pour toute modification de prix, même si vous êtes déjà connecté."
+            />
 
             {error && (
               <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>

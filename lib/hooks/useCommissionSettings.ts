@@ -35,12 +35,31 @@ function commissionErrorMessage(code: string | undefined, error: string): string
   return error || 'Erreur lors de la mise à jour du tarif';
 }
 
+/** Message affiché quand le chargement des commissions échoue (jamais le message brut, en anglais). */
+const READ_ERROR_MESSAGE = 'Impossible de charger les commissions.';
+
+function commissionReadErrorMessage(code: string | undefined): string {
+  if (code === 'unauthenticated') {
+    return 'Session expirée. Reconnectez-vous puis rechargez la page.';
+  }
+  if (code === 'not-found') {
+    return 'Restaurant introuvable.';
+  }
+  return READ_ERROR_MESSAGE;
+}
+
+function logReadFailure(error: unknown): null {
+  console.error('[commissions] lecture impossible', error);
+  return null;
+}
+
 export function useCommissionSettings() {
   return useQuery({
     queryKey: ['commissionSettings'],
     queryFn: async () => {
-      const result = await getCommissionSettingsAction();
-      if (!result.ok) throw new Error(result.error);
+      // Un échec de l'action serveur elle-même (ex. session admin expirée) arrive en exception.
+      const result = await getCommissionSettingsAction().catch(logReadFailure);
+      if (!result?.ok) throw new Error(commissionReadErrorMessage(result?.code));
       return result.data;
     },
     staleTime: 60 * 1000,
@@ -51,10 +70,12 @@ export function useRestaurantCommission(restaurantId: string) {
   return useQuery({
     queryKey: ['restaurantCommission', restaurantId],
     queryFn: async () => {
-      const result = await getRestaurantCommissionAction(restaurantId);
-      if (!result.ok) throw new Error(result.error);
+      // Un échec de l'action serveur elle-même (ex. session admin expirée) arrive en exception.
+      const result = await getRestaurantCommissionAction(restaurantId).catch(logReadFailure);
+      if (!result?.ok) throw new Error(commissionReadErrorMessage(result?.code));
       return result.data.commission;
     },
+    enabled: !!restaurantId,
     staleTime: 60 * 1000,
   });
 }

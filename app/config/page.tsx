@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
+import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 
 // ─── Editable number field ───────────────────────────────────────────────────
 
@@ -315,6 +316,9 @@ export default function ConfigPage() {
 
       {/* Subscription prices (Stripe) */}
       <SubscriptionPricesCard />
+
+      {/* Booking commissions (Essentiel plan) */}
+      <CommissionRatesCard />
 
       {/* Operations */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
