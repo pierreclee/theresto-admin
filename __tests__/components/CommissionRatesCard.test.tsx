@@ -135,4 +135,26 @@ describe('CommissionRatesCard', () => {
       totpCode: '123456',
     });
   });
+
+  it("après un conflit, ne remplace plus la saisie dès que l'admin a modifié un champ", async () => {
+    mutateAsync.mockRejectedValueOnce(new CommissionMutationError(COMMISSION_CONFLICT_MESSAGE, 'failed-precondition'));
+    const { rerender } = render(<CommissionRatesCard />);
+    fireEvent.click(screen.getByText('Modifier'));
+    submitGuestFee('0,30');
+    await screen.findByRole('alert');
+
+    // Le rechargement renvoie des valeurs identiques : l'admin ressaisit…
+    fireEvent.change(screen.getByLabelText('Par couvert'), { target: { value: '0,40' } });
+
+    // …puis un rechargement en arrière-plan apporte d'autres valeurs.
+    mockQuery = {
+      ...loadedQuery,
+      data: {
+        ...loadedQuery.data,
+        settings: { ...loadedQuery.data.settings, guestFeeHt: 0.5, updatedAt: '2026-10-16T10:45:00Z' },
+      },
+    };
+    rerender(<CommissionRatesCard />);
+    expect(screen.getByLabelText('Par couvert')).toHaveValue('0,40');
+  });
 });

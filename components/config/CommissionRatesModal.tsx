@@ -162,7 +162,11 @@ export function CommissionRatesModal({
                     type="text"
                     inputMode={field.kind === 'euro' ? 'decimal' : 'numeric'}
                     value={drafts[field.key] ?? ''}
-                    onChange={(e) => setDrafts((d) => ({ ...d, [field.key]: e.target.value }))}
+                    onChange={(e) => {
+                      // L'admin ressaisit : plus de remise à jour automatique après un conflit.
+                      setStaleInitialsKey(null);
+                      setDrafts((d) => ({ ...d, [field.key]: e.target.value }));
+                    }}
                     onKeyDown={(e) => e.key === 'Enter' && goToConfirm()}
                     autoFocus={index === 0}
                     className="w-full text-base font-semibold border border-gray-200 rounded-xl px-4 py-2 pr-14 focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/20"
