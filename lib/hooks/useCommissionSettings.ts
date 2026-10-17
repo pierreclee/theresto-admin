@@ -11,19 +11,12 @@ import {
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
 
-/**
- * L'Edge Function renvoie `internal` avec ce message quand le tarif a bien été
- * modifié mais que l'écriture dans platform_logs a échoué.
- */
-function isAuditLogFailure(code: string | undefined, error: string): boolean {
-  return code === 'internal' && error.includes('journalisation');
-}
+/** Le tarif est modifié mais l'écriture dans platform_logs a échoué (auditLogged=false). */
+const AUDIT_NOT_LOGGED_MESSAGE =
+  "Le tarif a bien été modifié, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.";
 
 /** Message affiché à l'admin pour une erreur de l'Edge Function. */
 function commissionErrorMessage(code: string | undefined, error: string): string {
-  if (isAuditLogFailure(code, error)) {
-    return "Le tarif a bien été modifié, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.";
-  }
   if (code === 'unauthenticated') {
     return 'Session expirée. Reconnectez-vous puis recommencez.';
   }
@@ -66,9 +59,8 @@ export function useRestaurantCommission(restaurantId: string) {
   });
 }
 
-// Les requêtes sont invalidées même en cas d'erreur (onSettled) : un échec de
-// journalisation survient après la modification, et un conflit de concurrence
-// signifie que les données affichées sont périmées.
+// Les requêtes sont invalidées même en cas d'erreur (onSettled) : un conflit
+// de concurrence signifie que les données affichées sont périmées.
 
 export function useUpdateGlobalCommissionRates() {
   const toast = useToast();
@@ -90,8 +82,9 @@ export function useUpdateGlobalCommissionRates() {
       if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
       return result.data;
     },
-    onSuccess: () => {
-      toast('Tarif des commissions mis à jour');
+    onSuccess: ({ auditLogged }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast('Tarif des commissions mis à jour');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['commissionSettings'] });
@@ -118,8 +111,9 @@ export function useUpdateRestaurantCommissionRates(restaurantId: string) {
       if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
       return result.data;
     },
-    onSuccess: () => {
-      toast('Tarif personnalisé enregistré');
+    onSuccess: ({ auditLogged }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast('Tarif personnalisé enregistré');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] });
@@ -137,8 +131,9 @@ export function useResetRestaurantCommissionRates(restaurantId: string) {
       if (!result.ok) throw new Error(commissionErrorMessage(result.code, result.error));
       return result.data;
     },
-    onSuccess: () => {
-      toast('Le restaurant suit de nouveau le tarif global');
+    onSuccess: ({ auditLogged }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast('Le restaurant suit de nouveau le tarif global');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] });

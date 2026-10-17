@@ -14,6 +14,12 @@ import type {
 // optimiste) est toujours envoyé explicitement : le serveur refuse une clé
 // absente, et n'accepte null que pour un restaurant sans tarif propre.
 
+/** Résultat d'une modification ; auditLogged=false si la journalisation a échoué (le tarif est modifié). */
+export interface CommissionUpdateResult {
+  updatedAt: string;
+  auditLogged: boolean;
+}
+
 const FUNCTION_NAME = 'commission-settings';
 
 export async function getCommissionSettingsAction(): Promise<
@@ -29,7 +35,7 @@ export async function updateGlobalCommissionRatesAction(input: {
   minInvoiceHt: number;
   maxCarryMonths: number;
   expectedUpdatedAt: string;
-}): Promise<ActionResult<{ updatedAt: string }>> {
+}): Promise<ActionResult<CommissionUpdateResult>> {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, {
     action: 'updateGlobalCommissionRates',
@@ -53,7 +59,7 @@ export async function updateRestaurantCommissionRatesAction(input: {
   tableFeeHt: number;
   guestFeeHt: number;
   expectedUpdatedAt: string | null;
-}): Promise<ActionResult<{ updatedAt: string }>> {
+}): Promise<ActionResult<CommissionUpdateResult>> {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, {
     action: 'updateRestaurantCommissionRates',
@@ -67,7 +73,7 @@ export async function updateRestaurantCommissionRatesAction(input: {
 export async function resetRestaurantCommissionRatesAction(input: {
   restaurantId: string;
   expectedUpdatedAt: string | null;
-}): Promise<ActionResult<{ updatedAt: string }>> {
+}): Promise<ActionResult<CommissionUpdateResult>> {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, {
     action: 'resetRestaurantCommissionRates',
