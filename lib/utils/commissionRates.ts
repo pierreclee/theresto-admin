@@ -37,6 +37,15 @@ export function formatPeriod(period: string): string {
   return new Date(year, month - 1, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
 }
 
+/**
+ * Le restaurant est-il facturé à la commission ? Même règle que public.plan_rank
+ * côté base : tout plan autre que croissance / liberte / premium (y compris null)
+ * compte comme Essentiel.
+ */
+export function isEssentielPlan(plan: string | null): boolean {
+  return !['croissance', 'liberte', 'premium'].includes((plan ?? '').toLowerCase());
+}
+
 export const INVOICE_STATUS_LABELS: Record<CommissionInvoiceStatus, string> = {
   draft: 'En préparation',
   open: 'En attente de paiement',

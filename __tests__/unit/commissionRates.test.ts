@@ -2,6 +2,7 @@ import {
   INVOICE_STATUS_LABELS,
   formatEuro,
   formatPeriod,
+  isEssentielPlan,
   parseEuroInput,
   parseMonthsInput,
 } from '@/lib/utils/commissionRates';
@@ -62,5 +63,16 @@ describe('formatage', () => {
   it('libellés des statuts de facture', () => {
     expect(INVOICE_STATUS_LABELS.draft).toBe('En préparation');
     expect(INVOICE_STATUS_LABELS.open).toBe('En attente de paiement');
+  });
+});
+
+describe('isEssentielPlan', () => {
+  it('suit public.plan_rank : tout plan non payant est Essentiel', () => {
+    expect(isEssentielPlan('essentiel')).toBe(true);
+    expect(isEssentielPlan('free')).toBe(true);
+    expect(isEssentielPlan(null)).toBe(true);
+    expect(isEssentielPlan('Croissance')).toBe(false);
+    expect(isEssentielPlan('liberte')).toBe(false);
+    expect(isEssentielPlan('premium')).toBe(false);
   });
 });

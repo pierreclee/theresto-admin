@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
 import { FeeConfigModal } from './FeeConfigModal';
+import { CommissionSection } from './CommissionSection';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
@@ -481,6 +482,9 @@ export function RestaurantDetail({ restaurant }: Props) {
             </div>
           </div>
         </div>
+
+        {/* Commissions de réservation (plan Essentiel) */}
+        <CommissionSection restaurantId={restaurant.id} />
 
         {/* Informations techniques */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
