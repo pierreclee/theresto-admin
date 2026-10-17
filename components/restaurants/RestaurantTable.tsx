@@ -1,3 +1,5 @@
+import { normalizeSubscriptionPlan } from '@/lib/utils/subscriptionPlan';
+
 'use client';
 
 import { useState } from 'react';
@@ -16,7 +18,7 @@ const approvalLabel: Record<string, { label: string; className: string }> = {
 const planLabel: Record<string, { label: string; className: string }> = {
   liberte:    { label: 'Liberté', className: 'bg-purple-50 text-purple-700 border-purple-100' },
   croissance: { label: 'Croissance', className: 'bg-blue-50 text-blue-700 border-blue-100' },
-  free:       { label: 'Essentiel', className: 'bg-gray-50 text-gray-500 border-gray-100' },
+  essentiel:  { label: 'Essentiel', className: 'bg-gray-50 text-gray-500 border-gray-100' },
   premium:    { label: 'Premium', className: 'bg-yellow-50 text-yellow-700 border-yellow-100' },
 };
 
@@ -58,7 +60,7 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
                 className="group/plan inline-flex items-center gap-1"
                 title="Modifier l'abonnement"
               >
-                <StatusBadge value={String(v)} map={planLabel} />
+                <StatusBadge value={normalizeSubscriptionPlan(v as string | null)} map={planLabel} />
                 <span className="text-xs text-gray-300 group-hover/plan:text-gray-500 transition-colors">✎</span>
               </button>
             ),
@@ -80,7 +82,7 @@ export function RestaurantTable({ restaurants, loading, onRowClick }: Restaurant
         <SubscriptionModal
           restaurantId={subscriptionTarget.id}
           restaurantName={subscriptionTarget.name}
-          currentPlan={(subscriptionTarget.subscription_plan ?? subscriptionTarget.subscriptionPlan ?? 'free') as 'free' | 'croissance' | 'liberte' | 'premium'}
+          currentPlan={normalizeSubscriptionPlan(subscriptionTarget.subscription_plan ?? subscriptionTarget.subscriptionPlan)}
           onClose={() => setSubscriptionTarget(null)}
         />
       )}

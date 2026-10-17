@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
 import { useToast } from '@/components/shared/Toaster';
 import type { UpdateRestaurantInput } from '@/lib/types/restaurant';
+import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 
 export function useRestaurants(filters?: { status?: string | string[]; subscription?: string; search?: string }) {
   return useQuery({
@@ -90,7 +91,7 @@ export function useUpdateSubscription() {
       plan,
     }: {
       restaurantId: string;
-      plan: 'free' | 'croissance' | 'liberte' | 'premium';
+      plan: SubscriptionPlanKey;
     }) => adminApi.updateSubscriptionPlan(restaurantId, plan),
     onSuccess: (_, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });

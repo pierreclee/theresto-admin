@@ -1,4 +1,5 @@
 import type { CommissionInvoiceStatus } from '@/lib/types/commissions';
+import { normalizeSubscriptionPlan } from '@/lib/utils/subscriptionPlan';
 
 // Mêmes règles que la validation de l'Edge Function commission-settings
 // (parseFee / parseIntInRange) : chiffres uniquement, 2 décimales au plus.
@@ -43,7 +44,7 @@ export function formatPeriod(period: string): string {
  * compte comme Essentiel.
  */
 export function isEssentielPlan(plan: string | null): boolean {
-  return !['croissance', 'liberte', 'premium'].includes((plan ?? '').toLowerCase());
+  return normalizeSubscriptionPlan(plan) === 'essentiel';
 }
 
 export const INVOICE_STATUS_LABELS: Record<CommissionInvoiceStatus, string> = {

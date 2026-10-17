@@ -37,6 +37,7 @@ import { adminApi } from '@/lib/api/admin';
 import { usersApi } from '@/lib/api/users';
 import NextLink from 'next/link';
 import { useQuery } from '@tanstack/react-query';
+import { normalizeSubscriptionPlan } from '@/lib/utils/subscriptionPlan';
 
 const ESTABLISHMENT_LABELS: Record<string, string> = {
   restaurant: 'Restaurant',
@@ -532,12 +533,12 @@ export function RestaurantDetail({ restaurant }: Props) {
           <SectionHeader title="Gestion" />
           <div className="p-3 space-y-1.5">
             {(() => {
-              const plan = (restaurant.subscription_plan ?? restaurant.subscriptionPlan) as string;
+              const plan = normalizeSubscriptionPlan(restaurant.subscription_plan ?? restaurant.subscriptionPlan);
               const labels: Record<string, string> = {
                 liberte:    'Liberté — cliquer pour modifier',
                 croissance: 'Croissance — cliquer pour modifier',
                 premium:    'Premium — cliquer pour modifier',
-                free:       'Essentiel — cliquer pour modifier',
+                essentiel:  'Essentiel — cliquer pour modifier',
               };
               return (
                 <ActionRow
@@ -578,7 +579,7 @@ export function RestaurantDetail({ restaurant }: Props) {
         <SubscriptionModal
           restaurantId={restaurant.id}
           restaurantName={restaurant.name}
-          currentPlan={(restaurant.subscription_plan ?? restaurant.subscriptionPlan ?? 'free') as 'free' | 'croissance' | 'liberte' | 'premium'}
+          currentPlan={normalizeSubscriptionPlan(restaurant.subscription_plan ?? restaurant.subscriptionPlan)}
           onClose={() => setModal(null)}
         />
       )}

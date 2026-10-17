@@ -1,3 +1,5 @@
+import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
+
 'use client';
 
 import { useState } from 'react';
@@ -5,11 +7,11 @@ import { X, Check } from 'lucide-react';
 import { useUpdateSubscription } from '@/lib/hooks/useRestaurants';
 import { formatPlanPrice, useSubscriptionPrices } from '@/lib/hooks/useSubscriptionPrices';
 
-type Plan = 'free' | 'croissance' | 'liberte' | 'premium';
+type Plan = SubscriptionPlanKey;
 
 const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; ringClass: string; features: string[] }[] = [
   {
-    key: 'free',
+    key: 'essentiel',
     label: 'Essentiel',
     badgeClass: 'bg-gray-50 text-gray-500 border-gray-200',
     cardClass: 'border-gray-200 bg-gray-50',
@@ -48,7 +50,7 @@ const PLANS: { key: Plan; label: string; badgeClass: string; cardClass: string; 
 interface Props {
   restaurantId: string;
   restaurantName: string;
-  currentPlan: 'free' | 'croissance' | 'liberte' | 'premium';
+  currentPlan: SubscriptionPlanKey;
   onClose: () => void;
 }
 
