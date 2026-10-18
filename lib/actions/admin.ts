@@ -203,7 +203,6 @@ export async function getConfigAction(): Promise<PlatformConfig> {
   if (error && error.code !== 'PGRST116') throw new Error(error.message); // Ignore missing row (we'll return defaults)
   
   return {
-    commissionRate: data?.commission_rate ?? 5,
     currency: data?.currency ?? 'EUR',
     maintenanceMode: data?.maintenance_mode ?? false,
     updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
@@ -225,7 +224,6 @@ export async function updateConfigAction(updates: UpdatePlatformConfigInput): Pr
   if (error) throw new Error(error.message);
   
   return {
-    commissionRate: data?.commission_rate ?? 5,
     currency: data?.currency ?? 'EUR',
     maintenanceMode: data?.maintenance_mode ?? false,
     updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
