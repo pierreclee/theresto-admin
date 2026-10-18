@@ -5,7 +5,6 @@ import {
   Phone,
   MapPin,
   Mail,
-  CreditCard,
   Star,
   TrendingUp,
   Percent,
@@ -460,13 +459,6 @@ export function RestaurantDetail({ restaurant }: Props) {
         {/* Paiement & revenus */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
           <SectionHeader title="Paiement & revenus" />
-          <div className="px-5">
-            <InfoRow
-              icon={CreditCard}
-              label="Mollie Connect"
-              value={(restaurant.is_mollie_connected ?? restaurant.isMollieConnected) ? 'Connecté ✓' : 'Non connecté'}
-            />
-          </div>
           <div className="grid grid-cols-2 gap-3 p-4">
             <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100">
               <div className="flex items-center gap-1.5 mb-1.5">
