@@ -10,7 +10,6 @@ const makeRestaurant = (overrides: Partial<Restaurant> = {}): Restaurant => ({
   approvalStatus: 'approved',
   subscriptionPlan: 'free',
   isMollieConnected: false,
-  commissionRate: 5,
   monthlyRevenue: 1200,
   createdAt: new Date('2024-01-01'),
   updatedAt: new Date('2024-01-01'),

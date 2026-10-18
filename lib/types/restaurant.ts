@@ -52,7 +52,6 @@ export interface Restaurant {
   approvalStatus?: string;
   subscriptionPlan?: string;
   isMollieConnected?: boolean;
-  commissionRate?: number;
   ownerId?: string;
   phone?: string;
   mainPhotoUrl?: string | null;
