@@ -32,6 +32,8 @@ export function useStripeOverview(restaurantId: string) {
     },
     enabled: !!restaurantId,
     staleTime: 60 * 1000,
+    // Lecture en direct depuis Stripe : les erreurs ne doivent pas être relancées automatiquement
+    retry: false,
   });
 }
 

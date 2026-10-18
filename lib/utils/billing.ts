@@ -19,7 +19,7 @@ export const REVENUE_CATEGORY_LABELS: Record<RevenueCategory, string> = {
   subscription: 'Abonnement',
   booking_commission: 'Commissions',
   application_fee: 'Frais sur paiements en ligne',
-  monthly_fee: 'Frais mensuels SEPA',
+  monthly_fee: 'Frais mensuels SEPA (ancien)',
 };
 
 export const REVENUE_CATEGORY_ORDER: RevenueCategory[] = [

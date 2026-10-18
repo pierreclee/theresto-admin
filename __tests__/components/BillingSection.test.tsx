@@ -63,7 +63,7 @@ describe('BillingSection', () => {
     const breakdown = screen.getByTestId('revenue-breakdown');
     expect(within(breakdown).getByText('Abonnement').parentElement).toHaveTextContent(eur(58));
     expect(within(breakdown).getByText('Frais sur paiements en ligne').parentElement).toHaveTextContent(eur(3.5));
-    expect(within(breakdown).getByText('Frais mensuels SEPA').parentElement).toHaveTextContent(eur(0));
+    expect(within(breakdown).getByText('Frais mensuels SEPA (ancien)').parentElement).toHaveTextContent(eur(0));
   });
 
   it('dernière facture absente : tiret', () => {
