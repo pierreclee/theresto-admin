@@ -15,6 +15,7 @@ import {
 import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
+import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 
 // ─── Editable number field ───────────────────────────────────────────────────
 
@@ -319,6 +320,9 @@ export default function ConfigPage() {
 
       {/* Booking commissions (Essentiel plan) */}
       <CommissionRatesCard />
+
+      {/* Registre des revenus (reprise depuis Stripe) */}
+      <RevenueBackfillCard />
 
       {/* Operations */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
