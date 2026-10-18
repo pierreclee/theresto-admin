@@ -2,6 +2,7 @@
 
 import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 import { useState } from 'react';
+import { TotpCodeField } from '@/components/shared/TotpCodeField';
 import { X, Check } from 'lucide-react';
 import { useUpdateSubscription } from '@/lib/hooks/useRestaurants';
 import { formatPlanPrice, useSubscriptionPrices } from '@/lib/hooks/useSubscriptionPrices';
@@ -55,6 +56,8 @@ interface Props {
 
 export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, onClose }: Props) {
   const [targetPlan, setTargetPlan] = useState<Plan | null>(null);
+  const [step, setStep] = useState<'plan' | 'confirm'>('plan');
+  const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const { mutateAsync, isPending } = useUpdateSubscription();
   // Prix courants depuis Stripe
@@ -68,10 +71,12 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
     if (!targetPlan) return;
     setError('');
     try {
-      await mutateAsync({ restaurantId, plan: targetPlan });
+      await mutateAsync({ restaurantId, plan: targetPlan, totpCode: code });
       onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erreur lors du changement de plan');
+      // Le code est à usage unique : on le vide pour en saisir un nouveau.
+      setCode('');
+      setError(e instanceof Error && e.message ? e.message : 'Erreur lors du changement de plan');
     }
   };
 
@@ -95,7 +100,7 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
             Restaurant : <span className="font-semibold text-gray-900">{restaurantName}</span>
           </p>
 
-          {/* Plan selector */}
+          {step === 'plan' && (
           <div className="grid grid-cols-3 gap-2">
             {PLANS.map((plan) => {
               const isCurrent = plan.key === currentPlan;
@@ -131,9 +136,27 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
               );
             })}
           </div>
+          )}
+
+          {step === 'confirm' && selected && (
+            <>
+              <p className="py-3 px-4 rounded-xl bg-gray-50 border border-gray-100 text-sm text-gray-700">
+                Passage de <span className="font-semibold">{PLANS.find((p) => p.key === currentPlan)?.label}</span> à{' '}
+                <span className="font-semibold">{selected.label}</span>. Le taux de commission des paiements en ligne
+                suit le plan du restaurant et sera modifié.
+              </p>
+              <TotpCodeField
+                value={code}
+                onChange={setCode}
+                onSubmit={handleConfirm}
+                busy={isPending}
+                hint="Requis pour tout changement de plan, car il modifie le taux de commission."
+              />
+            </>
+          )}
 
           {/* Features of selected plan */}
-          {selected && selected.features.length > 0 && (
+          {step === 'plan' && selected && selected.features.length > 0 && (
             <div className={`rounded-xl border p-3 ${selected.cardClass}`}>
               <p className="text-xs font-semibold uppercase tracking-wide mb-2 text-gray-600">
                 Fonctionnalités incluses
@@ -150,7 +173,7 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
           )}
 
           {error && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+            <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
               {error}
             </p>
           )}
@@ -159,19 +182,40 @@ export function SubscriptionModal({ restaurantId, restaurantName, currentPlan, o
         {/* Footer */}
         <div className="flex gap-2 px-5 pb-5">
           <button
-            onClick={onClose}
+            onClick={
+              step === 'confirm'
+                ? () => {
+                    setError('');
+                    setCode('');
+                    setStep('plan');
+                  }
+                : onClose
+            }
             disabled={isPending}
             className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors disabled:opacity-50"
           >
-            Annuler
+            {step === 'confirm' ? 'Retour' : 'Annuler'}
           </button>
-          <button
-            onClick={handleConfirm}
-            disabled={!targetPlan || isPending}
-            className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors disabled:opacity-40"
-          >
-            {isPending ? 'Traitement…' : targetPlan ? `Passer en ${PLANS.find(p => p.key === targetPlan)?.label}` : 'Sélectionner un plan'}
-          </button>
+          {step === 'plan' ? (
+            <button
+              onClick={() => {
+                setError('');
+                setStep('confirm');
+              }}
+              disabled={!targetPlan}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors disabled:opacity-40"
+            >
+              {targetPlan ? `Passer en ${selected?.label}` : 'Sélectionner un plan'}
+            </button>
+          ) : (
+            <button
+              onClick={handleConfirm}
+              disabled={code.length !== 6 || isPending}
+              className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors disabled:opacity-40"
+            >
+              {isPending ? 'Traitement…' : `Confirmer le passage en ${selected?.label}`}
+            </button>
+          )}
         </div>
       </div>
     </div>

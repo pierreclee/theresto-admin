@@ -10,6 +10,7 @@ import type { PlatformConfig, UpdatePlatformConfigInput } from '@/lib/types/conf
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/server';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
+import { hasRecentTotp, RECENT_MFA_REQUIRED_MESSAGE } from '@/lib/utils/recentMfa';
 import { normalizeSubscriptionPlan, type SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 
 export async function getStatsAction(): Promise<PlatformStats> {
@@ -166,15 +167,50 @@ export async function approveRestaurantAction(
   return { ok: true };
 }
 
+const SUBSCRIPTION_PLAN_KEYS: readonly SubscriptionPlanKey[] = ['essentiel', 'croissance', 'liberte', 'premium'];
+
+/**
+ * Change le plan d'un restaurant. Le taux de commission en ligne suit le plan
+ * (trigger SQL) : comme toute modification de taux, cela exige un code TOTP
+ * vérifié il y a moins de 5 min (session AAL2, claim amr), contrôlé ici côté serveur.
+ * Journalisé dans platform_logs (ancien/nouveau plan) ; auditLogged=false si
+ * l'écriture du journal échoue (le plan est alors déjà modifié).
+ */
 export async function updateSubscriptionPlanAction(
   restaurantId: string,
   plan: SubscriptionPlanKey
-): Promise<{ success: boolean }> {
-  await requireAdmin();
+): Promise<
+  | { success: true; auditLogged: boolean }
+  | { success: false; code: 'mfa-required'; error: string }
+> {
+  const user = await requireAdmin();
+  if (!SUBSCRIPTION_PLAN_KEYS.includes(plan)) throw new Error('Plan invalide');
+
+  const supabase = await createClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  // Résultat plutôt qu'exception : en production le message d'une exception serveur est masqué.
+  if (!hasRecentTotp(session?.access_token)) {
+    return { success: false, code: 'mfa-required', error: RECENT_MFA_REQUIRED_MESSAGE };
+  }
+
   const adminDb = await getAdminClient();
+  const { data: current, error: readError } = await adminDb
+    .from('restaurants').select('subscription_plan').eq('id', restaurantId).single();
+  if (readError) throw new Error(readError.message);
+
   const { error } = await adminDb.from('restaurants').update({ subscription_plan: plan }).eq('id', restaurantId);
   if (error) throw new Error(error.message);
-  return { success: true };
+
+  const { error: logError } = await adminDb.from('platform_logs').insert({
+    action: 'subscription_plan_changed',
+    target_type: 'restaurant',
+    target_id: restaurantId,
+    performed_by: user.id,
+    performed_by_email: user.email ?? null,
+    details: { oldPlan: current?.subscription_plan ?? null, newPlan: plan },
+  });
+  if (logError) console.error('[updateSubscriptionPlanAction] audit log error:', logError);
+  return { success: true, auditLogged: !logError };
 }
 
 export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> {
