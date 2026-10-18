@@ -1,5 +1,6 @@
 'use server';
 
+import { pickAllowedRestaurantUpdates, pickAllowedConfigUpdates } from '@/lib/utils/allowedUpdates';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Restaurant, UpdateRestaurantInput } from '@/lib/types/restaurant';
@@ -114,8 +115,16 @@ export async function getKbisUrlAction(
 
 export async function updateRestaurantAction(restaurantId: string, updates: UpdateRestaurantInput): Promise<Restaurant> {
   await requireAdmin();
+  // Liste blanche d'exécution : la commission passe uniquement par l'Edge Function commission-settings (TOTP).
+  const { allowed, ignored } = pickAllowedRestaurantUpdates(updates);
+  if (ignored.length > 0) {
+    console.warn('[updateRestaurantAction] champs ignorés :', ignored.join(', '));
+  }
+  if (Object.keys(allowed).length === 0) {
+    throw new Error('Aucun champ modifiable fourni.');
+  }
   const adminDb = await getAdminClient();
-  const { data, error } = await adminDb.from('restaurants').update(updates).eq('id', restaurantId).select().single();
+  const { data, error } = await adminDb.from('restaurants').update(allowed).eq('id', restaurantId).select().single();
   if (error) throw new Error(error.message);
   return data as any;
 }
@@ -204,10 +213,17 @@ export async function getConfigAction(): Promise<PlatformConfig> {
 
 export async function updateConfigAction(updates: UpdatePlatformConfigInput): Promise<PlatformConfig> {
   const user = await requireAdmin();
+  const { allowed, ignored } = pickAllowedConfigUpdates(updates);
+  if (ignored.length > 0) {
+    console.warn('[updateConfigAction] champs ignorés :', ignored.join(', '));
+  }
+  if (Object.keys(allowed).length === 0) {
+    throw new Error('Aucun champ modifiable fourni.');
+  }
   const adminDb = await getAdminClient();
   
   const payload = {
-    ...updates,
+    ...allowed,
     updated_by: user.email || user.id,
     updated_at: new Date().toISOString(),
   };

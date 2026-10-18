@@ -256,7 +256,7 @@ function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boo
 }
 
 export function RestaurantDetail({ restaurant }: Props) {
-  const { data: commission } = useRestaurantCommission(restaurant.id);
+  const { data: commission, isError: commissionError } = useRestaurantCommission(restaurant.id);
   const onlineRate = commission?.onlineRate ?? null;
   const [modal, setModal] = useState<'fee' | 'feeReset' | 'subscription' | 'approval' | 'edit' | null>(null);
 
@@ -553,7 +553,13 @@ export function RestaurantDetail({ restaurant }: Props) {
             <ActionRow
               icon={Percent}
               label="Commission paiements en ligne"
-              sublabel={onlineRate ? onlineRateLabel(onlineRate, commission?.subscriptionPlan ?? null) : 'Chargement…'}
+              sublabel={
+                commissionError
+                  ? 'Taux indisponible'
+                  : onlineRate
+                    ? onlineRateLabel(onlineRate, commission?.subscriptionPlan ?? null)
+                    : 'Chargement…'
+              }
               onClick={() => onlineRate && setModal('fee')}
             />
             {onlineRate?.custom != null && (
