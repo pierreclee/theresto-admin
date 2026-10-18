@@ -120,14 +120,6 @@ export async function updateRestaurantAction(restaurantId: string, updates: Upda
   return data as any;
 }
 
-export async function setAdminFeeAction(restaurantId: string, feePercent: number): Promise<{ success: boolean }> {
-  await requireAdmin();
-  const adminDb = await getAdminClient();
-  const { error } = await adminDb.from('restaurants').update({ commission_rate: feePercent }).eq('id', restaurantId);
-  if (error) throw new Error(error.message);
-  return { success: true };
-}
-
 // Approval and refusal go through the admin-onboarding Edge Function (status
 // update + owner email), with the admin's own session: the function checks
 // the admin claim. Suspension is a plain status update.

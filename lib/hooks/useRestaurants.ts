@@ -39,20 +39,6 @@ export function useUpdateRestaurant() {
   });
 }
 
-export function useSetAdminFee() {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ restaurantId, feePercent }: { restaurantId: string; feePercent: number }) =>
-      adminApi.setAdminFee(restaurantId, feePercent),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
-      toast('Commission mise à jour');
-    },
-    onError: () => toast('Erreur lors de la mise à jour', 'error'),
-  });
-}
-
 export function useApproveRestaurant() {
   const toast = useToast();
   const queryClient = useQueryClient();
