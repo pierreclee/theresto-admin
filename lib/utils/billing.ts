@@ -35,19 +35,28 @@ export function centsToEuro(cents: number): string {
 
 export function formatDateFr(iso: string | null): string {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
+  return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'Europe/Paris' }).format(new Date(iso));
 }
 
+/** Même instant à moins d'une minute près (Stripe est à la seconde, la base peut être arrondie). */
 function sameMinute(a: string | null, b: string | null): boolean {
   if (!a || !b) return a === b;
-  return Math.floor(new Date(a).getTime() / 60000) === Math.floor(new Date(b).getTime() / 60000);
+  return Math.abs(new Date(a).getTime() - new Date(b).getTime()) < 60_000;
+}
+
+/** La base indique un abonnement en cours alors que Stripe n'en a pas. */
+export function databaseHasLiveStatus(status: string | null): boolean {
+  return status !== null && status !== 'canceled';
 }
 
 /** Champs de la ligne restaurants qui ne suivent pas l'abonnement Stripe. */
 export function billingDrift(overview: StripeOverview): Set<DriftField> {
   const drift = new Set<DriftField>();
   const { subscription, database } = overview;
-  if (!subscription) return drift;
+  if (!subscription) {
+    if (databaseHasLiveStatus(database.status)) drift.add('status');
+    return drift;
+  }
   if (subscription.status !== database.status) drift.add('status');
   if (subscription.priceId !== database.priceId) drift.add('priceId');
   if (!sameMinute(subscription.currentPeriodEnd, database.periodEnd)) drift.add('periodEnd');

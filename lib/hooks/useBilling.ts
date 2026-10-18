@@ -50,12 +50,27 @@ export function useRevenueSummary(restaurantId: string) {
   });
 }
 
+/** Message affiché quand la reprise échoue (jamais le message brut, en anglais). */
+function backfillErrorMessage(code: string | undefined): string {
+  if (code === 'unauthenticated') return 'Session expirée. Reconnectez-vous puis recommencez.';
+  if (code === 'permission-denied') return 'Droits insuffisants.';
+  return 'Reprise impossible. Réessayez ou consultez les logs de migration-tools.';
+}
+
+function logBackfillFailure(error: unknown): null {
+  console.error('[billing] reprise impossible', error);
+  return null;
+}
+
 export function useBackfillPlatformRevenue() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async () => {
-      const result = await backfillPlatformRevenueAction();
-      if (!result.ok) throw new Error(result.error || 'Reprise impossible');
+      const result = await backfillPlatformRevenueAction().catch(logBackfillFailure);
+      if (!result?.ok) {
+        if (result) console.error('[billing] reprise impossible', result.error);
+        throw new Error(backfillErrorMessage(result?.code));
+      }
       return result.data.counts;
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['revenueSummary'] }),

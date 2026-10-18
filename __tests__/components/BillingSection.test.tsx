@@ -124,4 +124,53 @@ describe('BillingSection', () => {
     expect(screen.getByText('Impossible de charger les revenus.')).toBeInTheDocument();
     expect(screen.getByText('Actif')).toBeInTheDocument();
   });
+
+  it('abonnement Stripe absent mais base active : « Aucun » avec badge Écart', () => {
+    mockOverview = {
+      data: { ...overview, subscription: null, upcomingInvoice: null },
+      isPending: false,
+      error: null,
+    };
+    render(<BillingSection restaurantId="r1" />);
+    const row = screen.getByText('Abonnement', { selector: 'span.text-gray-500' }).parentElement!;
+    expect(row).toHaveTextContent('Aucun');
+    expect(within(row).getByText('Écart')).toBeInTheDocument();
+    expect(row).toHaveTextContent('la base indique Actif');
+  });
+
+  it('aucun client Stripe mais base active : badge Écart', () => {
+    mockOverview = {
+      data: { ...overview, customer: null, subscription: null, upcomingInvoice: null, dashboardUrl: null },
+      isPending: false,
+      error: null,
+    };
+    render(<BillingSection restaurantId="r1" />);
+    expect(screen.getByText('Aucun client Stripe')).toHaveTextContent('Écart');
+  });
+
+  it('badge Écart : valeur de la base pour les lecteurs d\'écran', () => {
+    mockOverview = {
+      data: { ...overview, database: { ...overview.database, status: 'past_due' } },
+      isPending: false,
+      error: null,
+    };
+    render(<BillingSection restaurantId="r1" />);
+    const badge = screen.getByText(/Écart/);
+    expect(badge).toHaveAttribute('title', 'La base indique : Impayé');
+    expect(badge).toHaveTextContent('la base indique Impayé');
+  });
+
+  it('erreur de rechargement Stripe : données conservées, pas d\'encart', () => {
+    mockOverview = { data: overview, isPending: false, error: new Error('Impossible de lire les données Stripe.') };
+    render(<BillingSection restaurantId="r1" />);
+    expect(screen.getByText('Actif')).toBeInTheDocument();
+    expect(screen.queryByText('Impossible de lire les données Stripe.')).not.toBeInTheDocument();
+  });
+
+  it('erreur de rechargement du registre : données conservées, pas d\'encart', () => {
+    mockSummary = { data: summary, isPending: false, error: new Error('Impossible de charger les revenus.') };
+    render(<BillingSection restaurantId="r1" />);
+    expect(screen.getByTestId('total-paid')).toHaveTextContent(eur(73.9));
+    expect(screen.queryByText('Impossible de charger les revenus.')).not.toBeInTheDocument();
+  });
 });

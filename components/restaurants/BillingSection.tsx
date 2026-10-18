@@ -27,22 +27,22 @@ export function BillingSection({ restaurantId }: { restaurantId: string }) {
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Facturation TheResto</h3>
       </div>
       <div className="p-5 space-y-5">
-        {revenue.error ? (
-          <ErrorBox message={revenue.error.message} />
-        ) : revenue.isPending || !revenue.data ? (
-          <Skeleton />
-        ) : (
+        {revenue.data ? (
           <RevenueBlock summary={revenue.data} />
+        ) : revenue.error ? (
+          <ErrorBox message={revenue.error.message} />
+        ) : (
+          <Skeleton />
         )}
 
         <div className="border-t border-gray-50 pt-4">
           <p className="text-xs font-semibold text-gray-500 mb-3">Stripe en direct</p>
-          {overview.error ? (
-            <ErrorBox message={overview.error.message} />
-          ) : overview.isPending || !overview.data ? (
-            <Skeleton />
-          ) : (
+          {overview.data ? (
             <StripeBlock overview={overview.data} />
+          ) : overview.error ? (
+            <ErrorBox message={overview.error.message} />
+          ) : (
+            <Skeleton />
           )}
         </div>
       </div>
@@ -89,14 +89,23 @@ function RevenueBlock({ summary }: { summary: RevenueSummary }) {
   );
 }
 
-function DriftBadge({ field, drift }: { field: DriftField; drift: Set<DriftField> }) {
+function DriftBadge({
+  field,
+  drift,
+  databaseValue,
+}: {
+  field: DriftField;
+  drift: Set<DriftField>;
+  databaseValue?: string;
+}) {
   if (!drift.has(field)) return null;
   return (
     <span
-      title="La base ne suit pas Stripe sur ce champ"
+      title={databaseValue !== undefined ? `La base indique : ${databaseValue}` : 'La base ne suit pas Stripe sur ce champ'}
       className="ml-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase rounded bg-amber-50 text-amber-700 border border-amber-200"
     >
       Écart
+      {databaseValue !== undefined && <span className="sr-only"> : la base indique {databaseValue}</span>}
     </span>
   );
 }
@@ -113,9 +122,18 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 function StripeBlock({ overview }: { overview: StripeOverview }) {
   const { customer, subscription, upcomingInvoice } = overview;
   const url = safeStripeDashboardUrl(overview.dashboardUrl);
-  if (!customer) return <p className="text-sm text-gray-500">Aucun client Stripe</p>;
-
   const drift = billingDrift(overview);
+  const dbStatus = overview.database.status;
+  const dbStatusLabel = dbStatus ? (SUBSCRIPTION_STATUS_LABELS[dbStatus] ?? dbStatus) : '—';
+  if (!customer) {
+    return (
+      <p className="text-sm text-gray-500">
+        Aucun client Stripe
+        <DriftBadge field="status" drift={drift} databaseValue={dbStatusLabel} />
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3">
       <div className="divide-y divide-gray-50">
@@ -123,23 +141,30 @@ function StripeBlock({ overview }: { overview: StripeOverview }) {
           <>
             <Row label="Statut">
               {SUBSCRIPTION_STATUS_LABELS[subscription.status] ?? subscription.status}
-              <DriftBadge field="status" drift={drift} />
+              <DriftBadge field="status" drift={drift} databaseValue={dbStatusLabel} />
             </Row>
             <Row label="Plan">
               {subscription.productName ?? subscription.priceId ?? '—'}
-              <DriftBadge field="priceId" drift={drift} />
+              <DriftBadge field="priceId" drift={drift} databaseValue={overview.database.priceId ?? '—'} />
             </Row>
             <Row label="Fin de période">
               {formatDateFr(subscription.currentPeriodEnd)}
-              <DriftBadge field="periodEnd" drift={drift} />
+              <DriftBadge field="periodEnd" drift={drift} databaseValue={formatDateFr(overview.database.periodEnd)} />
             </Row>
             <Row label="Résiliation programmée">
               {subscription.cancelAtPeriodEnd ? 'Oui' : 'Non'}
-              <DriftBadge field="cancelAtPeriodEnd" drift={drift} />
+              <DriftBadge
+                field="cancelAtPeriodEnd"
+                drift={drift}
+                databaseValue={overview.database.cancelAtPeriodEnd ? 'Oui' : 'Non'}
+              />
             </Row>
           </>
         ) : (
-          <Row label="Abonnement">Aucun</Row>
+          <Row label="Abonnement">
+            Aucun
+            <DriftBadge field="status" drift={drift} databaseValue={dbStatusLabel} />
+          </Row>
         )}
         <Row label="Moyen de paiement">{paymentMethodLabel(customer.paymentMethod)}</Row>
         <Row label="E-mail de facturation">{customer.email ?? '—'}</Row>

@@ -2,6 +2,7 @@
 import {
   billingDrift,
   centsToEuro,
+  formatDateFr,
   paymentMethodLabel,
   safeStripeDashboardUrl,
 } from '@/lib/utils/billing';
@@ -36,8 +37,39 @@ describe('billingDrift', () => {
     expect([...drift].sort()).toEqual(['cancelAtPeriodEnd', 'periodEnd', 'priceId', 'status']);
   });
 
-  it('pas d\'abonnement Stripe : aucun écart calculé', () => {
-    expect(billingDrift({ ...overview, subscription: null }).size).toBe(0);
+  it('pas d\'abonnement Stripe et statut en base nul : aucun écart', () => {
+    const drift = billingDrift({ ...overview, subscription: null, database: { ...overview.database, status: null } });
+    expect(drift.size).toBe(0);
+  });
+
+  it('pas d\'abonnement Stripe et statut en base résilié : aucun écart', () => {
+    const drift = billingDrift({ ...overview, subscription: null, database: { ...overview.database, status: 'canceled' } });
+    expect(drift.size).toBe(0);
+  });
+
+  it('pas d\'abonnement Stripe mais base active : écart de statut', () => {
+    expect([...billingDrift({ ...overview, subscription: null })]).toEqual(['status']);
+  });
+
+  it('fin de période : tolérance de moins d\'une minute, y compris à cheval sur la minute', () => {
+    const withEnd = (stripe: string | null, db: string | null) =>
+      billingDrift({
+        ...overview,
+        subscription: { ...overview.subscription!, currentPeriodEnd: stripe },
+        database: { ...overview.database, periodEnd: db },
+      });
+    expect(withEnd('2026-11-01T12:00:59Z', '2026-11-01T12:01:00Z').has('periodEnd')).toBe(false);
+    expect(withEnd('2026-11-01T12:00:00Z', '2026-11-01T12:02:00Z').has('periodEnd')).toBe(true);
+    expect(withEnd(null, '2026-11-01T12:00:00Z').has('periodEnd')).toBe(true);
+    expect(withEnd('2026-11-01T12:00:00Z', null).has('periodEnd')).toBe(true);
+    expect(withEnd(null, null).has('periodEnd')).toBe(false);
+  });
+});
+
+describe('formatDateFr', () => {
+  it('affiche la date à Paris', () => {
+    expect(formatDateFr('2026-10-05T23:30:00Z')).toBe('06/10/2026');
+    expect(formatDateFr(null)).toBe('—');
   });
 });
 
