@@ -1,6 +1,6 @@
 'use server';
 
-import { pickAllowedRestaurantUpdates, pickAllowedConfigUpdates } from '@/lib/utils/allowedUpdates';
+import { pickAllowedRestaurantUpdates, pickAllowedConfigUpdates, toConfigColumns } from '@/lib/utils/allowedUpdates';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Restaurant, UpdateRestaurantInput } from '@/lib/types/restaurant';
@@ -259,7 +259,7 @@ export async function updateConfigAction(updates: UpdatePlatformConfigInput): Pr
   const adminDb = await getAdminClient();
   
   const payload = {
-    ...allowed,
+    ...toConfigColumns(allowed),
     updated_by: user.email || user.id,
     updated_at: new Date().toISOString(),
   };

@@ -42,3 +42,11 @@ export function pickAllowedRestaurantUpdates(input: unknown) {
 export function pickAllowedConfigUpdates(input: unknown) {
   return pickAllowed(input, ALLOWED_CONFIG_UPDATE_FIELDS);
 }
+
+/** Colonnes de app_config pour les champs de configuration (camelCase côté app, snake_case en base). */
+export function toConfigColumns(allowed: Record<string, unknown>): Record<string, unknown> {
+  const columns: Record<string, unknown> = {};
+  if ('currency' in allowed) columns.currency = allowed.currency;
+  if ('maintenanceMode' in allowed) columns.maintenance_mode = allowed.maintenanceMode;
+  return columns;
+}

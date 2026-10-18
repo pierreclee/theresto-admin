@@ -3,6 +3,7 @@ import {
   ALLOWED_CONFIG_UPDATE_FIELDS,
   pickAllowedRestaurantUpdates,
   pickAllowedConfigUpdates,
+  toConfigColumns,
 } from '@/lib/utils/allowedUpdates';
 
 describe('pickAllowedRestaurantUpdates', () => {
@@ -65,5 +66,20 @@ describe('pickAllowedConfigUpdates', () => {
 
   it('objet vide après filtre', () => {
     expect(pickAllowedConfigUpdates({ foo: 1 }).allowed).toEqual({});
+  });
+});
+
+describe('toConfigColumns', () => {
+  it('mappe maintenanceMode vers la colonne maintenance_mode', () => {
+    expect(toConfigColumns({ maintenanceMode: true })).toEqual({ maintenance_mode: true });
+    expect(toConfigColumns({ maintenanceMode: false, currency: 'USD' })).toEqual({
+      maintenance_mode: false,
+      currency: 'USD',
+    });
+  });
+
+  it('ne produit que les colonnes fournies', () => {
+    expect(toConfigColumns({ currency: 'EUR' })).toEqual({ currency: 'EUR' });
+    expect(toConfigColumns({})).toEqual({});
   });
 });
