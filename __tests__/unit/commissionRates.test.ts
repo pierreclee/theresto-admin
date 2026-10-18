@@ -2,9 +2,11 @@ import {
   INVOICE_STATUS_LABELS,
   formatEuro,
   formatPeriod,
+  formatPercent,
   isEssentielPlan,
   parseEuroInput,
   parseMonthsInput,
+  parsePercentInput,
 } from '@/lib/utils/commissionRates';
 
 describe('parseEuroInput', () => {
@@ -74,5 +76,30 @@ describe('isEssentielPlan', () => {
     expect(isEssentielPlan('Croissance')).toBe(false);
     expect(isEssentielPlan('liberte')).toBe(false);
     expect(isEssentielPlan('premium')).toBe(false);
+  });
+});
+
+describe('parsePercentInput', () => {
+  it('accepte virgule ou point, 2 décimales au plus, entre 0 et 100', () => {
+    expect(parsePercentInput('5')).toBe(5);
+    expect(parsePercentInput(' 4,5 ')).toBe(4.5);
+    expect(parsePercentInput('3.25')).toBe(3.25);
+    expect(parsePercentInput('0')).toBe(0);
+    expect(parsePercentInput('100')).toBe(100);
+  });
+  it('refuse le reste', () => {
+    expect(parsePercentInput('100,01')).toBeNull();
+    expect(parsePercentInput('4,555')).toBeNull();
+    expect(parsePercentInput('-1')).toBeNull();
+    expect(parsePercentInput('5 %')).toBeNull();
+    expect(parsePercentInput('')).toBeNull();
+  });
+});
+
+describe('formatPercent', () => {
+  it('formate à la française', () => {
+    expect(formatPercent(5)).toMatch(/^5\s%$/);
+    expect(formatPercent(4.5)).toMatch(/^4,5\s%$/);
+    expect(formatPercent(3.25)).toMatch(/^3,25\s%$/);
   });
 });

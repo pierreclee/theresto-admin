@@ -6,16 +6,18 @@ import { TotpCodeField } from '@/components/shared/TotpCodeField';
 import {
   CommissionMutationError,
   formatEuro,
+  formatPercent,
   parseEuroInput,
   parseMonthsInput,
+  parsePercentInput,
 } from '@/lib/utils/commissionRates';
 
 export interface CommissionRateField {
   key: string;
   label: string;
   initial: number;
-  kind: 'euro' | 'months';
-  /** Maximum pour un montant (défaut 100 €). */
+  kind: 'euro' | 'months' | 'percent';
+  /** Maximum pour un montant en euros (défaut 100 €). */
   max?: number;
 }
 
@@ -28,6 +30,7 @@ function initialsKeyOf(fields: CommissionRateField[]): string {
 }
 
 function formatFieldValue(field: CommissionRateField, value: number): string {
+  if (field.kind === 'percent') return formatPercent(value);
   return field.kind === 'euro' ? `${formatEuro(value)} HT` : `${value} mois`;
 }
 
@@ -81,12 +84,19 @@ export function CommissionRatesModal({
     const parsed: Record<string, number> = {};
     for (const field of fields) {
       const raw = drafts[field.key] ?? '';
-      const value = field.kind === 'euro' ? parseEuroInput(raw, field.max) : parseMonthsInput(raw);
+      const value =
+        field.kind === 'euro'
+          ? parseEuroInput(raw, field.max)
+          : field.kind === 'percent'
+            ? parsePercentInput(raw)
+            : parseMonthsInput(raw);
       if (value === null) {
         setError(
           field.kind === 'euro'
             ? `${field.label} : montant invalide (entre 0 et ${field.max ?? 100} €, 2 décimales maximum)`
-            : `${field.label} : nombre de mois invalide (entier entre 0 et 12)`,
+            : field.kind === 'percent'
+              ? `${field.label} : taux invalide (entre 0 et 100 %, 2 décimales maximum)`
+              : `${field.label} : nombre de mois invalide (entier entre 0 et 12)`,
         );
         return;
       }
@@ -160,7 +170,7 @@ export function CommissionRatesModal({
                   <input
                     id={`rate-${field.key}`}
                     type="text"
-                    inputMode={field.kind === 'euro' ? 'decimal' : 'numeric'}
+                    inputMode={field.kind === 'months' ? 'numeric' : 'decimal'}
                     value={drafts[field.key] ?? ''}
                     onChange={(e) => {
                       // L'admin ressaisit : plus de remise à jour automatique après un conflit.
@@ -172,7 +182,7 @@ export function CommissionRatesModal({
                     className="w-full text-base font-semibold border border-gray-200 rounded-xl px-4 py-2 pr-14 focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/20"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                    {field.kind === 'euro' ? '€ HT' : 'mois'}
+                    {field.kind === 'euro' ? '€ HT' : field.kind === 'percent' ? '%' : 'mois'}
                   </span>
                 </div>
               </div>

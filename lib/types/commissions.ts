@@ -31,6 +31,25 @@ export interface CommissionInvoiceSummary {
   hostedInvoiceUrl: string | null;
 }
 
+/** Taux globaux des paiements en ligne (%, commission Stripe Connect). */
+export interface OnlineCommissionRates {
+  croissance: number;
+  liberte: number;
+  updatedAt: string;
+}
+
+/** Taux des paiements en ligne d'un restaurant. */
+export interface RestaurantOnlineRate {
+  /** Taux appliqué aux paiements (%). */
+  effective: number;
+  /** Taux particulier, null si le restaurant suit le taux de son plan. */
+  custom: number | null;
+  /** Taux du plan actuel du restaurant. */
+  planRate: number;
+  /** Dernière modification depuis l'admin (null si jamais modifié). */
+  updatedAt: string | null;
+}
+
 /** Tarif effectif d'un restaurant (personnalisé ou global) et état de facturation. */
 export interface RestaurantCommission {
   tableFeeHt: number;
@@ -43,4 +62,5 @@ export interface RestaurantCommission {
   paymentMethodReady: boolean;
   suspended: boolean;
   invoices: CommissionInvoiceSummary[];
+  onlineRate: RestaurantOnlineRate | null;
 }

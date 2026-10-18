@@ -23,6 +23,16 @@ export function parseMonthsInput(raw: string): number | null {
   return value <= 12 ? value : null;
 }
 
+/** Taux saisi en % (« 4,5 » ou « 4.5 ») entre 0 et 100, 2 décimales au plus. null si invalide. */
+export function parsePercentInput(raw: string): number | null {
+  return parseEuroInput(raw, 100);
+}
+
+/** « 4,5 % » (espace insécable avant %) */
+export function formatPercent(value: number): string {
+  return `${new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(value)} %`;
+}
+
 /** « 1,00 € » */
 export function formatEuro(value: number): string {
   return new Intl.NumberFormat('fr-FR', {
