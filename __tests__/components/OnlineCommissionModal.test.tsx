@@ -50,3 +50,19 @@ describe('OnlineCommissionModal', () => {
     );
   });
 });
+
+describe('OnlineCommissionModal (0 %)', () => {
+  beforeEach(() => mutateAsync.mockReset());
+
+  it('avertit pour 0 % sans bloquer l enregistrement', async () => {
+    mutateAsync.mockResolvedValue({ updatedAt: 'x', auditLogged: true });
+    render(<OnlineCommissionModal restaurantId="r1" mode="edit" onlineRate={followsPlan} onClose={() => {}} />);
+    fireEvent.change(screen.getByLabelText('Taux particulier'), { target: { value: '0' } });
+    expect(screen.getByText('Un taux de 0 % supprime toute commission sur les paiements en ligne.')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Continuer'));
+    confirmWithCode('Enregistrer le taux particulier');
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith({ rate: 0, expectedUpdatedAt: null, totpCode: '123456' }),
+    );
+  });
+});

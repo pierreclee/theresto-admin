@@ -12,6 +12,9 @@ import {
   parsePercentInput,
 } from '@/lib/utils/commissionRates';
 
+/** Avertissement affiché (sans bloquer) quand un taux saisi vaut 0 %. */
+export const ZERO_PERCENT_WARNING = 'Un taux de 0 % supprime toute commission sur les paiements en ligne.';
+
 export interface CommissionRateField {
   key: string;
   label: string;
@@ -132,6 +135,12 @@ export function CommissionRatesModal({
     }
   };
 
+  // Avertissement non bloquant : 0 % reste une valeur valide.
+  const hasZeroPercent =
+    step === 'form'
+      ? fields.some((f) => f.kind === 'percent' && parsePercentInput(drafts[f.key] ?? '') === 0)
+      : fields.some((f) => f.kind === 'percent' && values[f.key] === 0);
+
   const changedFields = fields.filter((f) => values[f.key] !== undefined && values[f.key] !== f.initial);
   const isUnchanged = hasForm && changedFields.length === 0;
 
@@ -216,6 +225,16 @@ export function CommissionRatesModal({
             <AlertTriangle size={15} className="shrink-0 mt-0.5" />
             <p>{warning}</p>
           </div>
+
+          {hasZeroPercent && (
+            <p
+              role="status"
+              className="flex gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-800"
+            >
+              <AlertTriangle size={15} className="shrink-0 mt-0.5" />
+              {ZERO_PERCENT_WARNING}
+            </p>
+          )}
 
           {error && (
             <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
