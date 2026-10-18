@@ -297,7 +297,7 @@ export default function ConfigPage() {
             <EditableNumberRow
               icon={Percent}
               label="Commission par défaut"
-              description="Taux Mollie Connect appliqué aux nouveaux restaurants"
+              description="Taux Stripe Connect appliqué aux nouveaux restaurants"
               value={config?.commissionRate ?? 5}
               suffix="%"
               min={0}
