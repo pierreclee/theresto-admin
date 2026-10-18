@@ -29,6 +29,7 @@ import {
 import type { Restaurant } from '@/lib/types/restaurant';
 import { FeeConfigModal } from './FeeConfigModal';
 import { CommissionSection } from './CommissionSection';
+import { BillingSection } from './BillingSection';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
@@ -483,6 +484,9 @@ export function RestaurantDetail({ restaurant }: Props) {
             </div>
           </div>
         </div>
+
+        {/* Facturation TheResto : revenus (registre) + Stripe en direct */}
+        <BillingSection restaurantId={restaurant.id} />
 
         {/* Commissions de réservation (plan Essentiel) */}
         <CommissionSection restaurantId={restaurant.id} />
