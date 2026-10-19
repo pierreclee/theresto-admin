@@ -4,141 +4,15 @@ import { useState } from 'react';
 import {
   ShieldCheck,
   Clock,
-  Percent,
   Globe,
-  Pencil,
-  Check,
-  X,
   AlertTriangle,
   Power,
 } from 'lucide-react';
 import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
+import { OnlineCommissionRatesCard } from '@/components/config/OnlineCommissionRatesCard';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
-
-// ─── Editable number field ───────────────────────────────────────────────────
-
-function EditableNumberRow({
-  icon: Icon,
-  label,
-  description,
-  value,
-  suffix,
-  min,
-  max,
-  step,
-  onSave,
-}: {
-  icon: React.ElementType;
-  label: string;
-  description: string;
-  value: number;
-  suffix?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  onSave: (v: number) => Promise<void>;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value.toString());
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleSave = async () => {
-    const num = parseFloat(draft);
-    if (isNaN(num) || (min !== undefined && num < min) || (max !== undefined && num > max)) {
-      setError(`Valeur invalide (${min ?? ''}–${max ?? ''})`);
-      return;
-    }
-    setSaving(true);
-    setError('');
-    try {
-      await onSave(num);
-      setEditing(false);
-    } catch {
-      setError('Erreur lors de la sauvegarde');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleCancel = () => {
-    setDraft(value.toString());
-    setError('');
-    setEditing(false);
-  };
-
-  return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center flex-shrink-0">
-          <Icon size={15} className="text-gray-500" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-800">{label}</p>
-          <p className="text-xs text-gray-400">{description}</p>
-          {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
-        </div>
-      </div>
-
-      {editing ? (
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <div className="relative">
-            <input
-              type="number"
-              value={draft}
-              min={min}
-              max={max}
-              step={step ?? 0.1}
-              onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave();
-                if (e.key === 'Escape') handleCancel();
-              }}
-              autoFocus
-              className="w-24 text-sm text-right border border-[#FF6B35] rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 pr-8"
-            />
-            {suffix && (
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
-                {suffix}
-              </span>
-            )}
-          </div>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-7 h-7 rounded-lg bg-green-50 border border-green-100 flex items-center justify-center text-green-600 hover:bg-green-100 transition-colors disabled:opacity-50"
-          >
-            <Check size={13} />
-          </button>
-          <button
-            onClick={handleCancel}
-            disabled={saving}
-            className="w-7 h-7 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-100 transition-colors"
-          >
-            <X size={13} />
-          </button>
-        </div>
-      ) : (
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <span className="text-sm font-semibold text-gray-700 bg-gray-50 border border-gray-100 px-3 py-1 rounded-lg">
-            {value}{suffix}
-          </span>
-          <button
-            onClick={() => {
-              setDraft(value.toString());
-              setEditing(true);
-            }}
-            className="w-7 h-7 rounded-lg border border-gray-100 flex items-center justify-center text-gray-400 hover:text-[#FF6B35] hover:border-[#FF6B35]/30 hover:bg-orange-50 transition-colors"
-          >
-            <Pencil size={12} />
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
 
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
@@ -294,17 +168,6 @@ export default function ConfigPage() {
           <ConfigSkeleton />
         ) : (
           <div className="px-5">
-            <EditableNumberRow
-              icon={Percent}
-              label="Commission par défaut"
-              description="Taux Stripe Connect appliqué aux nouveaux restaurants"
-              value={config?.commissionRate ?? 5}
-              suffix="%"
-              min={0}
-              max={100}
-              step={0.5}
-              onSave={(v) => mutateAsync({ commissionRate: v }).then(() => undefined)}
-            />
             <ReadOnlyRow
               icon={Globe}
               label="Devise"
@@ -317,6 +180,9 @@ export default function ConfigPage() {
 
       {/* Subscription prices (Stripe) */}
       <SubscriptionPricesCard />
+
+      {/* Online payment commissions (Croissance / Liberté) */}
+      <OnlineCommissionRatesCard />
 
       {/* Booking commissions (Essentiel plan) */}
       <CommissionRatesCard />

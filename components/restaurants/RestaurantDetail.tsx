@@ -26,7 +26,9 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
-import { FeeConfigModal } from './FeeConfigModal';
+import { OnlineCommissionModal, onlineRateLabel } from './OnlineCommissionModal';
+import { useRestaurantCommission } from '@/lib/hooks/useCommissionSettings';
+import { formatPercent } from '@/lib/utils/commissionRates';
 import { CommissionSection } from './CommissionSection';
 import { BillingSection } from './BillingSection';
 import { SubscriptionModal } from './SubscriptionModal';
@@ -254,7 +256,9 @@ function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boo
 }
 
 export function RestaurantDetail({ restaurant }: Props) {
-  const [modal, setModal] = useState<'fee' | 'subscription' | 'approval' | 'edit' | null>(null);
+  const { data: commission, isError: commissionError } = useRestaurantCommission(restaurant.id);
+  const onlineRate = commission?.onlineRate ?? null;
+  const [modal, setModal] = useState<'fee' | 'feeReset' | 'subscription' | 'approval' | 'edit' | null>(null);
 
   const formatCurrency = (v: number) =>
     v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -548,10 +552,24 @@ export function RestaurantDetail({ restaurant }: Props) {
             })()}
             <ActionRow
               icon={Percent}
-              label="Commission TheResto"
-              sublabel={`Taux actuel : ${restaurant.commission_rate ?? restaurant.commissionRate}%`}
-              onClick={() => setModal('fee')}
+              label="Commission paiements en ligne"
+              sublabel={
+                commissionError
+                  ? 'Taux indisponible'
+                  : onlineRate
+                    ? onlineRateLabel(onlineRate, commission?.subscriptionPlan ?? null)
+                    : 'Chargement…'
+              }
+              onClick={() => onlineRate && setModal('fee')}
             />
+            {onlineRate?.custom != null && (
+              <ActionRow
+                icon={Percent}
+                label="Revenir au taux du plan"
+                sublabel={`Taux du plan : ${formatPercent(onlineRate.planRate)}`}
+                onClick={() => setModal('feeReset')}
+              />
+            )}
             <ActionRow
               icon={approvalCfg.icon}
               label="Statut d'approbation"
@@ -562,12 +580,12 @@ export function RestaurantDetail({ restaurant }: Props) {
         </div>
       </div>
 
-      {modal === 'fee' && (
-        <FeeConfigModal
-          isOpen
-          onClose={() => setModal(null)}
+      {(modal === 'fee' || modal === 'feeReset') && onlineRate && (
+        <OnlineCommissionModal
           restaurantId={restaurant.id}
-          currentFee={(restaurant.commission_rate ?? restaurant.commissionRate) ?? 5}
+          mode={modal === 'fee' ? 'edit' : 'reset'}
+          onlineRate={onlineRate}
+          onClose={() => setModal(null)}
         />
       )}
 

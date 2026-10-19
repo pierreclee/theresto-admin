@@ -5,7 +5,9 @@ import {
   getCommissionSettingsAction,
   getRestaurantCommissionAction,
   resetRestaurantCommissionRatesAction,
+  setRestaurantOnlineRateAction,
   updateGlobalCommissionRatesAction,
+  updateGlobalOnlineRatesAction,
   updateRestaurantCommissionRatesAction,
 } from '@/lib/actions/commissionSettings';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
@@ -28,7 +30,7 @@ function commissionErrorMessage(code: string | undefined, error: string): string
     return COMMISSION_CONFLICT_MESSAGE;
   }
   if (code === 'invalid-argument') {
-    return 'Montants invalides.';
+    return 'Valeurs invalides.';
   }
   if (code === 'not-found') {
     return 'Restaurant introuvable.';
@@ -165,5 +167,72 @@ export function useResetRestaurantCommissionRates(restaurantId: string) {
       else toast('Le restaurant suit de nouveau le tarif global');
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
+  });
+}
+
+export function useUpdateGlobalOnlineRates() {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      totpCode,
+      ...input
+    }: {
+      croissanceRate: number;
+      liberteRate: number;
+      expectedUpdatedAt: string;
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await updateGlobalOnlineRatesAction(input);
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
+      return result.data;
+    },
+    onSuccess: ({ auditLogged }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast('Taux des paiements en ligne mis à jour');
+    },
+    // Les taux effectifs des restaurants ont pu changer : fiches et listes à recharger.
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['commissionSettings'] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurantCommission'] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurant'] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurants'] }),
+      ]),
+  });
+}
+
+export function useSetRestaurantOnlineRate(restaurantId: string) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      totpCode,
+      ...input
+    }: {
+      rate: number | null;
+      expectedUpdatedAt: string | null;
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await setRestaurantOnlineRateAction({ restaurantId, ...input });
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
+      return result.data;
+    },
+    onSuccess: ({ auditLogged }, { rate }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast(rate === null ? 'Le restaurant suit de nouveau le taux de son plan' : 'Taux particulier enregistré');
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurant', restaurantId] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurants'] }),
+      ]),
   });
 }

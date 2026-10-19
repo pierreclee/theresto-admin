@@ -1,5 +1,4 @@
 export interface PlatformConfig {
-  commissionRate: number;
   currency: string;
   maintenanceMode: boolean;
   updatedAt?: Date;
@@ -7,7 +6,6 @@ export interface PlatformConfig {
 }
 
 export interface UpdatePlatformConfigInput {
-  commissionRate?: number;
   currency?: string;
   maintenanceMode?: boolean;
 }

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/lib/api/admin';
+import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
 import type { UpdateRestaurantInput } from '@/lib/types/restaurant';
 import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
@@ -39,20 +40,6 @@ export function useUpdateRestaurant() {
   });
 }
 
-export function useSetAdminFee() {
-  const toast = useToast();
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ restaurantId, feePercent }: { restaurantId: string; feePercent: number }) =>
-      adminApi.setAdminFee(restaurantId, feePercent),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['restaurants'] });
-      toast('Commission mise à jour');
-    },
-    onError: () => toast('Erreur lors de la mise à jour', 'error'),
-  });
-}
-
 export function useApproveRestaurant() {
   const toast = useToast();
   const queryClient = useQueryClient();
@@ -85,20 +72,32 @@ export function useApproveRestaurant() {
 export function useUpdateSubscription() {
   const toast = useToast();
   const queryClient = useQueryClient();
+  // Le plan fixe le taux de commission en ligne : code TOTP vérifié avant l'action,
+  // revérifié côté serveur (session AAL2 récente). Les erreurs sont affichées par la modale.
   return useMutation({
-    mutationFn: ({
+    mutationFn: async ({
       restaurantId,
       plan,
+      totpCode,
     }: {
       restaurantId: string;
       plan: SubscriptionPlanKey;
-    }) => adminApi.updateSubscriptionPlan(restaurantId, plan),
-    onSuccess: (_, vars) => {
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await adminApi.updateSubscriptionPlan(restaurantId, plan);
+      if (!result.success) throw new Error(result.error);
+      return result;
+    },
+    onSuccess: ({ auditLogged }, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['platformStats'] });
-      toast('Abonnement mis à jour');
+      if (!auditLogged) {
+        toast("Abonnement mis à jour, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast('Abonnement mis à jour');
+      }
     },
-    onError: () => toast('Erreur lors de la mise à jour de l\'abonnement', 'error'),
   });
 }

@@ -5,10 +5,11 @@ import { invokeEdgeFunction, type ActionResult } from '@/lib/supabase/invokeFunc
 import type {
   CommissionMonthlyTotal,
   CommissionSettings,
+  OnlineCommissionRates,
   RestaurantCommission,
 } from '@/lib/types/commissions';
 
-// Tarifs des commissions de réservation (plan Essentiel), via l'Edge Function
+// Tarifs des commissions de réservation (plan Essentiel) et taux des paiements en ligne, via l'Edge Function
 // commission-settings. Toute modification exige côté serveur un code TOTP
 // vérifié il y a moins de 5 min. `expectedUpdatedAt` (contrôle de concurrence
 // optimiste) est toujours envoyé explicitement : le serveur refuse une clé
@@ -23,7 +24,7 @@ export interface CommissionUpdateResult {
 const FUNCTION_NAME = 'commission-settings';
 
 export async function getCommissionSettingsAction(): Promise<
-  ActionResult<{ settings: CommissionSettings; totals: CommissionMonthlyTotal[] }>
+  ActionResult<{ settings: CommissionSettings; onlineRates: OnlineCommissionRates; totals: CommissionMonthlyTotal[] }>
 > {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, { action: 'getCommissionSettings' });
@@ -78,6 +79,35 @@ export async function resetRestaurantCommissionRatesAction(input: {
   return invokeEdgeFunction(FUNCTION_NAME, {
     action: 'resetRestaurantCommissionRates',
     restaurantId: input.restaurantId,
+    expectedUpdatedAt: input.expectedUpdatedAt ?? null,
+  });
+}
+
+export async function updateGlobalOnlineRatesAction(input: {
+  croissanceRate: number;
+  liberteRate: number;
+  expectedUpdatedAt: string;
+}): Promise<ActionResult<CommissionUpdateResult>> {
+  await requireAdmin();
+  return invokeEdgeFunction(FUNCTION_NAME, {
+    action: 'updateGlobalOnlineRates',
+    croissanceRate: input.croissanceRate,
+    liberteRate: input.liberteRate,
+    expectedUpdatedAt: input.expectedUpdatedAt,
+  });
+}
+
+/** rate null : le restaurant suit de nouveau le taux de son plan. */
+export async function setRestaurantOnlineRateAction(input: {
+  restaurantId: string;
+  rate: number | null;
+  expectedUpdatedAt: string | null;
+}): Promise<ActionResult<CommissionUpdateResult>> {
+  await requireAdmin();
+  return invokeEdgeFunction(FUNCTION_NAME, {
+    action: 'setRestaurantOnlineRate',
+    restaurantId: input.restaurantId,
+    rate: input.rate,
     expectedUpdatedAt: input.expectedUpdatedAt ?? null,
   });
 }
