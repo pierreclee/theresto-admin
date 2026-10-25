@@ -56,6 +56,7 @@ export function CommissionRatesModal({
   warning,
   confirmLabel,
   unchangedConfirmation,
+  zeroPercentWarning = ZERO_PERCENT_WARNING,
   onConfirm,
   onClose,
 }: {
@@ -64,6 +65,8 @@ export function CommissionRatesModal({
   warning: string;
   confirmLabel: string;
   unchangedConfirmation?: { notice: string; confirmLabel: string };
+  /** Avertissement affiché pour un taux de 0 %. */
+  zeroPercentWarning?: string;
   onConfirm: (values: Record<string, number>, totpCode: string) => Promise<void>;
   onClose: () => void;
 }) {
@@ -232,7 +235,7 @@ export function CommissionRatesModal({
               className="flex gap-2.5 p-3 rounded-xl bg-amber-50 border border-amber-100 text-xs text-amber-800"
             >
               <AlertTriangle size={15} className="shrink-0 mt-0.5" />
-              {ZERO_PERCENT_WARNING}
+              {zeroPercentWarning}
             </p>
           )}
 

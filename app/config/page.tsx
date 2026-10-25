@@ -11,6 +11,7 @@ import {
 import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
 import { OnlineCommissionRatesCard } from '@/components/config/OnlineCommissionRatesCard';
+import { PrivatizationCommissionRatesCard } from '@/components/config/PrivatizationCommissionRatesCard';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 
@@ -183,6 +184,9 @@ export default function ConfigPage() {
 
       {/* Online payment commissions (Croissance / Liberté) */}
       <OnlineCommissionRatesCard />
+
+      {/* Privatization commissions (Croissance / Liberté) */}
+      <PrivatizationCommissionRatesCard />
 
       {/* Booking commissions (Essentiel plan) */}
       <CommissionRatesCard />

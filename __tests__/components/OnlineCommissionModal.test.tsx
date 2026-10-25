@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { OnlineCommissionModal, onlineRateLabel } from '@/components/restaurants/OnlineCommissionModal';
+import { OnlineCommissionModal } from '@/components/restaurants/OnlineCommissionModal';
+import { planRateLabel } from '@/components/restaurants/PlanRateModal';
 
 const mutateAsync = jest.fn();
 jest.mock('@/lib/hooks/useCommissionSettings', () => ({
@@ -15,11 +16,11 @@ function confirmWithCode(label: string) {
   fireEvent.click(screen.getByText(label));
 }
 
-describe('onlineRateLabel', () => {
+describe('planRateLabel', () => {
   it('indique la provenance du taux', () => {
-    expect(onlineRateLabel(followsPlan, 'croissance')).toMatch(/^5\s% \(taux du plan Croissance\)$/);
-    expect(onlineRateLabel(custom, 'liberte')).toMatch(/^7,25\s% \(taux particulier\)$/);
-    expect(onlineRateLabel(followsPlan, 'essentiel')).toMatch(/^5\s% \(taux du plan Croissance\)$/);
+    expect(planRateLabel(followsPlan, 'croissance')).toMatch(/^5\s% \(taux du plan Croissance\)$/);
+    expect(planRateLabel(custom, 'liberte')).toMatch(/^7,25\s% \(taux particulier\)$/);
+    expect(planRateLabel(followsPlan, 'essentiel')).toMatch(/^5\s% \(taux du plan Croissance\)$/);
   });
 });
 
