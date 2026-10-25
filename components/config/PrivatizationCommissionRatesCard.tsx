@@ -12,9 +12,9 @@ export function PrivatizationCommissionRatesCard() {
   return (
     <PlanCommissionRatesCard
       title="Commission privatisations"
-      description="Prélevée sur les paiements de privatisation créés à partir de maintenant (carte, et commission notée lors d'un virement), pour les restaurants sans taux particulier."
+      description="Facturée chaque mois sur ce que le restaurant conserve des paiements de privatisation (carte ou virement, remboursements déduits), pour les restaurants sans taux particulier."
       modalTitle="Taux des privatisations"
-      warning="S'applique aux paiements de privatisation créés à partir de maintenant, pour tous les restaurants sans taux particulier. Les paiements déjà créés gardent leur commission."
+      warning="S'applique aux privatisations dont le premier paiement est encaissé à partir de maintenant, pour tous les restaurants sans taux particulier. Les privatisations déjà payées gardent leur taux."
       zeroPercentWarning={PRIVATIZATION_ZERO_PERCENT_WARNING}
       rates={data?.privatizationRates}
       isPending={isPending}

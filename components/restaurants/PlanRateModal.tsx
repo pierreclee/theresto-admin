@@ -26,6 +26,8 @@ export function PlanRateModal({
   mode,
   rate,
   paymentsLabel,
+  editWarning,
+  resetWarning,
   zeroPercentWarning,
   onSave,
   onClose,
@@ -33,6 +35,9 @@ export function PlanRateModal({
   mode: 'edit' | 'reset';
   rate: RestaurantPlanRate;
   paymentsLabel: string;
+  /** Remplacent les textes construits avec [paymentsLabel]. */
+  editWarning?: string;
+  resetWarning?: string;
   zeroPercentWarning?: string;
   onSave: (input: { rate: number | null; expectedUpdatedAt: string | null; totpCode: string }) => Promise<unknown>;
   onClose: () => void;
@@ -42,7 +47,7 @@ export function PlanRateModal({
       <CommissionRatesModal
         title="Retour au taux du plan"
         fields={[]}
-        warning={`Le restaurant suivra de nouveau le taux de son plan (${formatPercent(rate.planRate)}) pour les prochains ${paymentsLabel}.`}
+        warning={resetWarning ?? `Le restaurant suivra de nouveau le taux de son plan (${formatPercent(rate.planRate)}) pour les prochains ${paymentsLabel}.`}
         confirmLabel="Revenir au taux du plan"
         onConfirm={async (_values, totpCode) => {
           await onSave({ rate: null, expectedUpdatedAt: rate.updatedAt, totpCode });
@@ -56,7 +61,7 @@ export function PlanRateModal({
     <CommissionRatesModal
       title="Taux particulier du restaurant"
       fields={[{ key: 'rate', label: 'Taux particulier', initial: rate.effective, kind: 'percent' }]}
-      warning={`S'applique aux ${paymentsLabel} créés à partir de maintenant. Ce taux ne suivra plus les changements du taux du plan.`}
+      warning={editWarning ?? `S'applique aux ${paymentsLabel} créés à partir de maintenant. Ce taux ne suivra plus les changements du taux du plan.`}
       zeroPercentWarning={zeroPercentWarning}
       confirmLabel="Enregistrer le taux particulier"
       unchangedConfirmation={

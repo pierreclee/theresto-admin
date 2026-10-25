@@ -23,7 +23,7 @@ describe('PrivatizationCommissionModal', () => {
     render(
       <PrivatizationCommissionModal restaurantId="r1" mode="edit" privatizationRate={followsPlan} onClose={() => {}} />,
     );
-    expect(screen.getByText(/paiements de privatisation créés à partir de maintenant/)).toBeInTheDocument();
+    expect(screen.getByText(/premier paiement est encaissé à partir de maintenant/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Taux particulier'), { target: { value: '1,5' } });
     fireEvent.click(screen.getByText('Continuer'));
     confirmWithCode('Enregistrer le taux particulier');
@@ -35,7 +35,7 @@ describe('PrivatizationCommissionModal', () => {
   it('revient au taux du plan avec le code 2FA', async () => {
     mutateAsync.mockResolvedValue({ updatedAt: 'x', auditLogged: true });
     render(<PrivatizationCommissionModal restaurantId="r1" mode="reset" privatizationRate={custom} onClose={() => {}} />);
-    expect(screen.getByText(/prochains paiements de privatisation/)).toBeInTheDocument();
+    expect(screen.getByText(/pour ses prochaines privatisations/)).toBeInTheDocument();
     confirmWithCode('Revenir au taux du plan');
     await waitFor(() =>
       expect(mutateAsync).toHaveBeenCalledWith({
