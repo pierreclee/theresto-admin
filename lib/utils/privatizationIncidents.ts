@@ -10,6 +10,7 @@ export const INCIDENT_KIND_LABELS: Record<PrivatizationIncidentKind, string> = {
   refund_awaiting_iban: 'IBAN du client attendu',
   paid_after_cancellation: 'Payé après annulation',
   customer_balance_funds: 'Virement non rattaché',
+  payment_mismatch: 'Paiement non conforme',
 };
 
 export const INCIDENT_KIND_HELP: Record<PrivatizationIncidentKind, string> = {
@@ -21,6 +22,8 @@ export const INCIDENT_KIND_HELP: Record<PrivatizationIncidentKind, string> = {
     'Un paiement a été encaissé alors que la privatisation était annulée ou refusée : remboursez le client.',
   customer_balance_funds:
     "Un virement est arrivé sans paiement à régler : l'argent est sur le solde client Stripe du restaurant. Restituez-le au client.",
+  payment_mismatch:
+    "Un paiement Stripe désignait cette privatisation sans correspondre au paiement attendu (montant, devise ou paiement déjà enregistré). Il a été ignoré : vérifiez dans le compte Stripe du restaurant qui l'a créé.",
 };
 
 export const INCIDENT_FILTERS: { value: PrivatizationIncidentFilter; label: string }[] = [

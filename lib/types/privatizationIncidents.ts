@@ -4,7 +4,8 @@ export type PrivatizationIncidentKind =
   | 'refund_failed'
   | 'refund_awaiting_iban'
   | 'paid_after_cancellation'
-  | 'customer_balance_funds';
+  | 'customer_balance_funds'
+  | 'payment_mismatch';
 
 export type PrivatizationIncidentStatus = 'open' | 'resolved' | 'ignored';
 
