@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
+import { useOpenIncidentCount } from '@/lib/hooks/usePrivatizationIncidents';
 import {
   LayoutDashboard,
   Store,
@@ -16,6 +17,7 @@ import {
   LogOut,
   ChevronRight,
   Clock,
+  AlertTriangle,
 } from 'lucide-react';
 
 const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
@@ -23,6 +25,7 @@ const routes: { href: string; label: string; icon: React.ElementType; exact?: bo
   { href: '/approvals', label: 'Approbations', icon: Clock, badge: true },
   { href: '/restaurants', label: 'Restaurants', icon: Store },
   { href: '/users', label: 'Utilisateurs', icon: Users },
+  { href: '/incidents', label: 'Incidents de paiement', icon: AlertTriangle },
   { href: '/monitoring', label: 'Monitoring', icon: Activity },
   { href: '/config', label: 'Configuration', icon: Settings },
 ];
@@ -35,6 +38,7 @@ export function Sidebar() {
 
   // Fetch pending approvals count
   const { data: pendingData } = useRestaurants({ status: TO_REVIEW_STATUSES });
+  const openIncidentCount = useOpenIncidentCount();
 
   if (pathname.startsWith('/auth/')) return null;
 
@@ -72,8 +76,12 @@ export function Sidebar() {
         {routes.map((route) => {
           const active = isActive(route);
           const Icon = route.icon;
-          const isApprovalsRoute = route.href === '/approvals';
-          const pendingCount = isApprovalsRoute ? (pendingData?.total ?? 0) : 0;
+          const pendingCount =
+            route.href === '/approvals'
+              ? (pendingData?.total ?? 0)
+              : route.href === '/incidents'
+                ? openIncidentCount
+                : 0;
 
           return (
             <Link
