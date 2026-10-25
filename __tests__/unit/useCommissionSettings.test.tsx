@@ -5,13 +5,17 @@ import {
   useCommissionSettings,
   useRestaurantCommission,
   useSetRestaurantOnlineRate,
+  useSetRestaurantPrivatizationRate,
   useUpdateGlobalOnlineRates,
+  useUpdateGlobalPrivatizationRates,
 } from '@/lib/hooks/useCommissionSettings';
 import {
   getCommissionSettingsAction,
   getRestaurantCommissionAction,
   setRestaurantOnlineRateAction,
+  setRestaurantPrivatizationRateAction,
   updateGlobalOnlineRatesAction,
+  updateGlobalPrivatizationRatesAction,
 } from '@/lib/actions/commissionSettings';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { COMMISSION_CONFLICT_MESSAGE, CommissionMutationError } from '@/lib/utils/commissionRates';
@@ -24,6 +28,8 @@ jest.mock('@/lib/actions/commissionSettings', () => ({
   updateRestaurantCommissionRatesAction: jest.fn(),
   updateGlobalOnlineRatesAction: jest.fn(),
   setRestaurantOnlineRateAction: jest.fn(),
+  updateGlobalPrivatizationRatesAction: jest.fn(),
+  setRestaurantPrivatizationRateAction: jest.fn(),
 }));
 jest.mock('@/lib/auth/verifyTotp', () => ({ verifyTotpCode: jest.fn() }));
 jest.mock('@/components/shared/Toaster', () => ({ useToast: () => jest.fn() }));
@@ -32,6 +38,8 @@ const getSettings = getCommissionSettingsAction as jest.Mock;
 const getRestaurant = getRestaurantCommissionAction as jest.Mock;
 const updateGlobalOnline = updateGlobalOnlineRatesAction as jest.Mock;
 const setRestaurantOnline = setRestaurantOnlineRateAction as jest.Mock;
+const updateGlobalPrivatization = updateGlobalPrivatizationRatesAction as jest.Mock;
+const setRestaurantPrivatization = setRestaurantPrivatizationRateAction as jest.Mock;
 const verifyTotp = verifyTotpCode as jest.Mock;
 
 function wrapper({ children }: { children: React.ReactNode }) {
@@ -149,5 +157,75 @@ describe('taux des paiements en ligne', () => {
       await result.current.mutateAsync({ rate: null, expectedUpdatedAt: 'ts', totpCode: '123456' });
     });
     expect(setRestaurantOnline).toHaveBeenCalledWith({ restaurantId: 'r1', rate: null, expectedUpdatedAt: 'ts' });
+  });
+});
+
+describe('taux des privatisations', () => {
+  beforeEach(() => {
+    jest.resetAllMocks();
+  });
+
+  it('useUpdateGlobalPrivatizationRates vérifie le code puis envoie les taux sans totpCode', async () => {
+    verifyTotp.mockResolvedValue(undefined);
+    updateGlobalPrivatization.mockResolvedValue({ ok: true, data: { updatedAt: 'x', auditLogged: true } });
+    const { result } = renderHook(() => useUpdateGlobalPrivatizationRates(), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({
+        croissanceRate: 3,
+        liberteRate: 2.5,
+        expectedUpdatedAt: '2026-10-25T10:00:00Z',
+        totpCode: '123456',
+      });
+    });
+    expect(verifyTotp.mock.invocationCallOrder[0]).toBeLessThan(
+      updateGlobalPrivatization.mock.invocationCallOrder[0],
+    );
+    expect(updateGlobalPrivatization).toHaveBeenCalledWith({
+      croissanceRate: 3,
+      liberteRate: 2.5,
+      expectedUpdatedAt: '2026-10-25T10:00:00Z',
+    });
+    expect(updateGlobalOnline).not.toHaveBeenCalled();
+  });
+
+  it('useUpdateGlobalPrivatizationRates signale un conflit de concurrence', async () => {
+    verifyTotp.mockResolvedValue(undefined);
+    updateGlobalPrivatization.mockResolvedValue({ ok: false, code: 'failed-precondition', error: 'conflict' });
+    const { result } = renderHook(() => useUpdateGlobalPrivatizationRates(), { wrapper });
+    let caught: unknown;
+    await act(async () => {
+      try {
+        await result.current.mutateAsync({ croissanceRate: 3, liberteRate: 3, expectedUpdatedAt: 'old', totpCode: '123456' });
+      } catch (e) {
+        caught = e;
+      }
+    });
+    expect((caught as CommissionMutationError).isConflict).toBe(true);
+  });
+
+  it("useUpdateGlobalPrivatizationRates n'appelle pas l'action si le code TOTP est refusé", async () => {
+    verifyTotp.mockRejectedValue(new Error('Code invalide'));
+    const { result } = renderHook(() => useUpdateGlobalPrivatizationRates(), { wrapper });
+    await act(async () => {
+      await result.current
+        .mutateAsync({ croissanceRate: 3, liberteRate: 3, expectedUpdatedAt: 'x', totpCode: '000000' })
+        .catch(() => undefined);
+    });
+    expect(updateGlobalPrivatization).not.toHaveBeenCalled();
+  });
+
+  it('useSetRestaurantPrivatizationRate envoie le taux particulier ou null', async () => {
+    verifyTotp.mockResolvedValue(undefined);
+    setRestaurantPrivatization.mockResolvedValue({ ok: true, data: { updatedAt: 'x', auditLogged: true } });
+    const { result } = renderHook(() => useSetRestaurantPrivatizationRate('r1'), { wrapper });
+    await act(async () => {
+      await result.current.mutateAsync({ rate: 1.5, expectedUpdatedAt: null, totpCode: '123456' });
+    });
+    expect(setRestaurantPrivatization).toHaveBeenCalledWith({ restaurantId: 'r1', rate: 1.5, expectedUpdatedAt: null });
+    await act(async () => {
+      await result.current.mutateAsync({ rate: null, expectedUpdatedAt: 'ts', totpCode: '123456' });
+    });
+    expect(setRestaurantPrivatization).toHaveBeenLastCalledWith({ restaurantId: 'r1', rate: null, expectedUpdatedAt: 'ts' });
+    expect(setRestaurantOnline).not.toHaveBeenCalled();
   });
 });

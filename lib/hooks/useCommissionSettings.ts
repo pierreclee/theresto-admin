@@ -6,8 +6,10 @@ import {
   getRestaurantCommissionAction,
   resetRestaurantCommissionRatesAction,
   setRestaurantOnlineRateAction,
+  setRestaurantPrivatizationRateAction,
   updateGlobalCommissionRatesAction,
   updateGlobalOnlineRatesAction,
+  updateGlobalPrivatizationRatesAction,
   updateRestaurantCommissionRatesAction,
 } from '@/lib/actions/commissionSettings';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
@@ -234,5 +236,65 @@ export function useSetRestaurantOnlineRate(restaurantId: string) {
         queryClient.invalidateQueries({ queryKey: ['restaurant', restaurantId] }),
         queryClient.invalidateQueries({ queryKey: ['restaurants'] }),
       ]),
+  });
+}
+
+export function useUpdateGlobalPrivatizationRates() {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      totpCode,
+      ...input
+    }: {
+      croissanceRate: number;
+      liberteRate: number;
+      expectedUpdatedAt: string;
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await updateGlobalPrivatizationRatesAction(input);
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
+      return result.data;
+    },
+    onSuccess: ({ auditLogged }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast('Taux des privatisations mis à jour');
+    },
+    // Les taux effectifs des restaurants sans taux particulier ont changé.
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['commissionSettings'] }),
+        queryClient.invalidateQueries({ queryKey: ['restaurantCommission'] }),
+      ]),
+  });
+}
+
+export function useSetRestaurantPrivatizationRate(restaurantId: string) {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      totpCode,
+      ...input
+    }: {
+      rate: number | null;
+      expectedUpdatedAt: string | null;
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await setRestaurantPrivatizationRateAction({ restaurantId, ...input });
+      if (!result.ok) {
+        throw new CommissionMutationError(commissionErrorMessage(result.code, result.error), result.code);
+      }
+      return result.data;
+    },
+    onSuccess: ({ auditLogged }, { rate }) => {
+      if (!auditLogged) toast(AUDIT_NOT_LOGGED_MESSAGE, 'error');
+      else toast(rate === null ? 'Le restaurant suit de nouveau le taux de son plan' : 'Taux particulier enregistré');
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
   });
 }
