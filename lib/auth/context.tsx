@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { AuthContextType } from './types';
 import { AdminUser } from '@/lib/types/admin';
+import { adminSessionExpiresAt } from '@/lib/utils/recentMfa';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -25,17 +26,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
 
     const supabase = createClient();
+    // Échéance de la session admin (TOTP + 2 h) : sessionValid repasse à false à
+    // cette heure-là, sans attendre un événement d'authentification.
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearExpiryTimer = () => {
+      if (expiryTimer !== undefined) clearTimeout(expiryTimer);
+      expiryTimer = undefined;
+    };
 
     const handleUser = async (supabaseUser: User | null) => {
+      clearExpiryTimer();
       if (supabaseUser) {
         const isAdmin = supabaseUser.app_metadata?.admin === true;
         
         const { data: mfaData, error: mfaError } = await supabase.auth.mfa.listFactors();
-        const hasMfaActual = !mfaError && (mfaData?.totp?.length > 0 || mfaData?.all?.length > 0);
+        // Seuls les facteurs vérifiés comptent (listFactors ne range dans `totp` que
+        // ceux-là) : un enrôlement abandonné renvoie vers l'enrôlement, pas vers un
+        // challenge sans facteur.
+        const hasMfaActual = !mfaError && (mfaData?.totp?.length ?? 0) > 0;
         
         const hasMfaClaim = supabaseUser.app_metadata?.mfaEnrolled === true;
-        const hasMfaVerified = localStorage.getItem('mfaVerified') === 'true';
-        const hasMfa = hasMfaClaim || hasMfaActual || hasMfaVerified;
+        const hasMfa = hasMfaClaim || hasMfaActual;
 
         setAdminUser({
           uid: supabaseUser.id,
@@ -46,19 +57,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (isAdmin && hasMfa) {
-          const sessionStart = localStorage.getItem('adminSessionStart');
-          const isValid = sessionStart
-            ? Date.now() - parseInt(sessionStart) < 2 * 60 * 60 * 1000
-            : false;
-          setSessionValid(isValid);
+          // Le jeton fait foi, avec la règle de requireAdmin : session AAL2 et code
+          // TOTP vérifié il y a moins de 2 h. Sinon, retour au challenge.
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+          const expiresAt = adminSessionExpiresAt(aal);
+          const remainingMs = expiresAt === null ? 0 : expiresAt - Date.now();
+          setSessionValid(remainingMs > 0);
+          if (remainingMs > 0) {
+            clearExpiryTimer();
+            expiryTimer = setTimeout(() => setSessionValid(false), remainingMs);
+          }
         } else {
           setSessionValid(false);
         }
       } else {
         setAdminUser(null);
         setSessionValid(false);
-        localStorage.removeItem('adminSessionStart');
-        localStorage.removeItem('mfaVerified');
       }
 
       setUser(supabaseUser);
@@ -90,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearExpiryTimer();
       if (authSubscription) {
         authSubscription.unsubscribe();
       }
@@ -99,8 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    localStorage.removeItem('adminSessionStart');
-    localStorage.removeItem('mfaVerified');
   };
 
   if (!mounted) {

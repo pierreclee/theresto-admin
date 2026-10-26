@@ -57,7 +57,6 @@ export default function LoginPage() {
       if (mfaData && mfaData.nextLevel === 'aal2' && mfaData.currentLevel === 'aal1') {
         router.push('/auth/mfa-challenge');
       } else {
-        localStorage.setItem('adminSessionStart', Date.now().toString());
         router.push('/');
       }
     } catch (err) {

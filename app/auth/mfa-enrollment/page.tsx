@@ -69,8 +69,6 @@ export default function MFAEnrollmentPage() {
       });
       if (verifyError) throw verifyError;
 
-      localStorage.setItem('adminSessionStart', Date.now().toString());
-      localStorage.setItem('mfaVerified', 'true');
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Erreur de vérification');
