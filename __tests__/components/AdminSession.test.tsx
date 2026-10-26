@@ -8,19 +8,24 @@ jest.mock('next/navigation', () => ({
 }));
 
 const getAuthenticatorAssuranceLevel = jest.fn();
+const verifiedFactors = { data: { totp: [{ id: 'f1', status: 'verified' }], all: [{ id: 'f1', status: 'verified' }] }, error: null };
 const auth = {
   getSession: jest.fn(),
   onAuthStateChange: jest.fn(() => ({ data: { subscription: { unsubscribe: jest.fn() } } })),
   signOut: jest.fn(),
   mfa: {
-    listFactors: jest.fn(async () => ({ data: { totp: [{ id: 'f1' }], all: [{ id: 'f1' }] }, error: null })),
+    listFactors: jest.fn(),
     getAuthenticatorAssuranceLevel,
+    challenge: jest.fn(),
+    verify: jest.fn(),
   },
 };
 jest.mock('@/lib/supabase/client', () => ({ createClient: () => ({ auth }) }));
 
 import { AuthProvider } from '@/lib/auth/context';
 import { AdminGuard } from '@/components/AdminGuard';
+import MFAChallengePage from '@/app/auth/mfa-challenge/page';
+import { fireEvent } from '@testing-library/react';
 
 const adminUser = { id: 'admin-1', email: 'a@theresto.fr', app_metadata: { admin: true }, user_metadata: {} };
 
@@ -40,6 +45,18 @@ describe('AuthProvider + AdminGuard : niveau AAL de la session', () => {
     localStorage.clear();
     pathname = '/';
     auth.getSession.mockResolvedValue({ data: { session: { user: adminUser } }, error: null });
+    auth.mfa.listFactors.mockResolvedValue(verifiedFactors);
+  });
+
+  it("envoie vers l'enrôlement un admin dont l'enrôlement TOTP a été abandonné", async () => {
+    auth.mfa.listFactors.mockResolvedValue({
+      data: { totp: [], all: [{ id: 'f0', status: 'unverified' }] },
+      error: null,
+    });
+    getAuthenticatorAssuranceLevel.mockResolvedValue({ data: { currentLevel: 'aal1', nextLevel: 'aal1' }, error: null });
+    renderApp();
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/auth/mfa-enrollment'));
+    expect(push).not.toHaveBeenCalledWith('/auth/mfa-challenge');
   });
 
   it('renvoie un admin en session AAL1 vers le challenge, même avec une session récente', async () => {
@@ -73,5 +90,34 @@ describe('AuthProvider + AdminGuard : niveau AAL de la session', () => {
     getAuthenticatorAssuranceLevel.mockResolvedValue({ data: { currentLevel: 'aal2', nextLevel: 'aal2' }, error: null });
     renderApp();
     await waitFor(() => expect(push).toHaveBeenCalledWith('/auth/mfa-challenge'));
+  });
+});
+
+describe('MFAChallengePage : code refusé', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    localStorage.clear();
+    auth.mfa.listFactors.mockResolvedValue(verifiedFactors);
+    auth.mfa.challenge.mockResolvedValue({ data: { id: 'c1' }, error: null });
+    auth.mfa.verify.mockResolvedValue({ error: { message: 'Invalid TOTP code entered' } });
+  });
+
+  async function submitWrongCode() {
+    render(<MFAChallengePage />);
+    fireEvent.change(screen.getByLabelText(/Code de vérification/), { target: { value: '123456' } });
+    fireEvent.submit(screen.getByLabelText(/Code de vérification/).closest('form')!);
+    await screen.findByText('Invalid TOTP code entered');
+  }
+
+  it("retire adminSessionStart s'il n'existait pas", async () => {
+    await submitWrongCode();
+    expect(localStorage.getItem('adminSessionStart')).toBeNull();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("remet l'ancienne valeur d'adminSessionStart", async () => {
+    localStorage.setItem('adminSessionStart', '1700000000000');
+    await submitWrongCode();
+    expect(localStorage.getItem('adminSessionStart')).toBe('1700000000000');
   });
 });

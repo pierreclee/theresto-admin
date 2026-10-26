@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { getSupabaseCredentials, type AppEnvironment } from './config';
-import { hasAal2 } from '@/lib/utils/recentMfa';
+import { ADMIN_SESSION_MAX_AGE_SECONDS, hasAal2, hasRecentTotp } from '@/lib/utils/recentMfa';
 
 export async function getServerEnvironment(): Promise<AppEnvironment> {
   const cookieStore = await cookies();
@@ -69,6 +69,10 @@ export async function requireAdmin() {
   // Le second facteur se vérifie côté serveur : le claim admin seul ne suffit pas (RGPD-28).
   if (!hasAal2(accessToken)) {
     throw new Error('Unauthorized: second factor required (AAL2 session).');
+  }
+  // Même durée de session que l'interface : au-delà de 2 h, le code TOTP est redemandé.
+  if (!hasRecentTotp(accessToken, Math.floor(Date.now() / 1000), ADMIN_SESSION_MAX_AGE_SECONDS)) {
+    throw new Error('Unauthorized: admin session expired, the TOTP code must be entered again (older than 2 h).');
   }
 
   return user;

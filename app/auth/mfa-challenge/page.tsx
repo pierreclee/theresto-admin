@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { restoreSessionStart } from '@/lib/auth/adminSession';
 
 export default function MFAChallengePage() {
   const router = useRouter();
@@ -17,6 +18,8 @@ export default function MFAChallengePage() {
     e.preventDefault();
     setError('');
     setVerifying(true);
+    // Remise en l'état si la vérification échoue (aucune session admin ouverte).
+    let previousSessionStart: string | null | undefined;
 
     try {
       if (!code || code.length !== 6) {
@@ -39,6 +42,7 @@ export default function MFAChallengePage() {
       // 3. Verify the code against the challenge. Le début de session est noté avant :
       // verify notifie le contexte (MFA_CHALLENGE_VERIFIED) avant de rendre la main.
       // Seul, il ne valide rien : le contexte exige aussi une session AAL2.
+      previousSessionStart = localStorage.getItem('adminSessionStart');
       localStorage.setItem('adminSessionStart', Date.now().toString());
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId: totpFactor.id,
@@ -50,6 +54,7 @@ export default function MFAChallengePage() {
 
       router.push('/');
     } catch (err: any) {
+      restoreSessionStart(previousSessionStart);
       setError(err.message || 'Erreur de vérification MFA');
       setVerifying(false);
     }

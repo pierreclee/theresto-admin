@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import { restoreSessionStart } from '@/lib/auth/adminSession';
 import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function MFAEnrollmentPage() {
@@ -45,6 +46,8 @@ export default function MFAEnrollmentPage() {
     e.preventDefault();
     setVerifying(true);
     setError('');
+    // Remise en l'état si la vérification échoue (aucune session admin ouverte).
+    let previousSessionStart: string | null | undefined;
 
     try {
       if (!factorId) {
@@ -64,6 +67,7 @@ export default function MFAEnrollmentPage() {
 
       // Noté avant verify, qui notifie le contexte avant de rendre la main ; le
       // contexte exige aussi une session AAL2 (RGPD-28).
+      previousSessionStart = localStorage.getItem('adminSessionStart');
       localStorage.setItem('adminSessionStart', Date.now().toString());
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId,
@@ -74,6 +78,7 @@ export default function MFAEnrollmentPage() {
 
       router.push('/');
     } catch (err: any) {
+      restoreSessionStart(previousSessionStart);
       setError(err.message || 'Erreur de vérification');
       setVerifying(false);
     }

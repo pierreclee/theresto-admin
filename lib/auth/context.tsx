@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { AuthContextType } from './types';
 import { AdminUser } from '@/lib/types/admin';
+import { ADMIN_SESSION_MAX_AGE_SECONDS } from '@/lib/utils/recentMfa';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,7 +32,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isAdmin = supabaseUser.app_metadata?.admin === true;
         
         const { data: mfaData, error: mfaError } = await supabase.auth.mfa.listFactors();
-        const hasMfaActual = !mfaError && (mfaData?.totp?.length > 0 || mfaData?.all?.length > 0);
+        // Seuls les facteurs vérifiés comptent (listFactors ne range dans `totp` que
+        // ceux-là) : un enrôlement abandonné renvoie vers l'enrôlement, pas vers un
+        // challenge sans facteur.
+        const hasMfaActual = !mfaError && (mfaData?.totp?.length ?? 0) > 0;
         
         const hasMfaClaim = supabaseUser.app_metadata?.mfaEnrolled === true;
         const hasMfa = hasMfaClaim || hasMfaActual;
@@ -50,7 +54,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
           const sessionStart = localStorage.getItem('adminSessionStart');
           const isValid = aal?.currentLevel === 'aal2' && (sessionStart
-            ? Date.now() - parseInt(sessionStart) < 2 * 60 * 60 * 1000
+            ? Date.now() - parseInt(sessionStart) < ADMIN_SESSION_MAX_AGE_SECONDS * 1000
             : false);
           setSessionValid(isValid);
         } else {

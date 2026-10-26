@@ -1,6 +1,12 @@
 /** Ancienneté maximale du dernier code TOTP vérifié (même règle que verifyRecentMfa côté Edge Functions). */
 export const RECENT_MFA_MAX_AGE_SECONDS = 300;
 
+/**
+ * Durée d'une session admin : au-delà, le code TOTP doit être ressaisi. Même règle
+ * côté navigateur (AuthProvider) et côté serveur (requireAdmin).
+ */
+export const ADMIN_SESSION_MAX_AGE_SECONDS = 2 * 60 * 60;
+
 export const RECENT_MFA_REQUIRED_MESSAGE =
   "Vérification en deux étapes expirée. Saisissez un nouveau code de votre application d'authentification.";
 
