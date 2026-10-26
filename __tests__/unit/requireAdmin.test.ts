@@ -64,6 +64,14 @@ describe('requireAdmin', () => {
     await expect(requireAdmin()).rejects.toThrow(/older than 2 h/);
   });
 
+  it('signale un refus de second facteur par le code mfa-required', async () => {
+    getUser.mockResolvedValue({ data: { user: admin }, error: null });
+    getSession.mockResolvedValue({ data: { session: { access_token: jwt({ aal: 'aal1' }) } } });
+    await expect(requireAdmin()).rejects.toMatchObject({ name: 'MfaRequiredError', code: 'mfa-required' });
+    getSession.mockResolvedValue({ data: { session: { access_token: aal2(3 * 60 * 60) } } });
+    await expect(requireAdmin()).rejects.toMatchObject({ code: 'mfa-required' });
+  });
+
   it('refuse un jeton que Supabase rejette (expiré ou révoqué)', async () => {
     getUser.mockResolvedValue({ data: { user: null }, error: { message: 'invalid JWT: token is expired' } });
     getSession.mockResolvedValue({ data: { session: { access_token: aal2() } } });

@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { AuthContextType } from './types';
 import { AdminUser } from '@/lib/types/admin';
-import { ADMIN_SESSION_MAX_AGE_SECONDS } from '@/lib/utils/recentMfa';
+import { adminSessionExpiresAt } from '@/lib/utils/recentMfa';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -26,8 +26,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
 
     const supabase = createClient();
+    // Échéance de la session admin (TOTP + 2 h) : sessionValid repasse à false à
+    // cette heure-là, sans attendre un événement d'authentification.
+    let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearExpiryTimer = () => {
+      if (expiryTimer !== undefined) clearTimeout(expiryTimer);
+      expiryTimer = undefined;
+    };
 
     const handleUser = async (supabaseUser: User | null) => {
+      clearExpiryTimer();
       if (supabaseUser) {
         const isAdmin = supabaseUser.app_metadata?.admin === true;
         
@@ -49,21 +57,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (isAdmin && hasMfa) {
-          // Le niveau réel de la session (claim aal du jeton) fait foi : une session
-          // AAL1 repasse par le challenge, quel que soit le contenu du localStorage.
+          // Le jeton fait foi, avec la règle de requireAdmin : session AAL2 et code
+          // TOTP vérifié il y a moins de 2 h. Sinon, retour au challenge.
           const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-          const sessionStart = localStorage.getItem('adminSessionStart');
-          const isValid = aal?.currentLevel === 'aal2' && (sessionStart
-            ? Date.now() - parseInt(sessionStart) < ADMIN_SESSION_MAX_AGE_SECONDS * 1000
-            : false);
-          setSessionValid(isValid);
+          const expiresAt = adminSessionExpiresAt(aal);
+          const remainingMs = expiresAt === null ? 0 : expiresAt - Date.now();
+          setSessionValid(remainingMs > 0);
+          if (remainingMs > 0) {
+            clearExpiryTimer();
+            expiryTimer = setTimeout(() => setSessionValid(false), remainingMs);
+          }
         } else {
           setSessionValid(false);
         }
       } else {
         setAdminUser(null);
         setSessionValid(false);
-        localStorage.removeItem('adminSessionStart');
       }
 
       setUser(supabaseUser);
@@ -95,6 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      clearExpiryTimer();
       if (authSubscription) {
         authSubscription.unsubscribe();
       }
@@ -104,7 +114,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    localStorage.removeItem('adminSessionStart');
   };
 
   if (!mounted) {
