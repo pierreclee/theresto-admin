@@ -5,11 +5,11 @@ import { invokeEdgeFunction, type ActionResult } from '@/lib/supabase/invokeFunc
 import type {
   CommissionMonthlyTotal,
   CommissionSettings,
-  OnlineCommissionRates,
+  PlanCommissionRates,
   RestaurantCommission,
 } from '@/lib/types/commissions';
 
-// Tarifs des commissions de réservation (plan Essentiel) et taux des paiements en ligne, via l'Edge Function
+// Tarifs des commissions de réservation (plan Essentiel), taux des paiements en ligne et des privatisations, via l'Edge Function
 // commission-settings. Toute modification exige côté serveur un code TOTP
 // vérifié il y a moins de 5 min. `expectedUpdatedAt` (contrôle de concurrence
 // optimiste) est toujours envoyé explicitement : le serveur refuse une clé
@@ -24,7 +24,12 @@ export interface CommissionUpdateResult {
 const FUNCTION_NAME = 'commission-settings';
 
 export async function getCommissionSettingsAction(): Promise<
-  ActionResult<{ settings: CommissionSettings; onlineRates: OnlineCommissionRates; totals: CommissionMonthlyTotal[] }>
+  ActionResult<{
+    settings: CommissionSettings;
+    onlineRates: PlanCommissionRates;
+    privatizationRates: PlanCommissionRates;
+    totals: CommissionMonthlyTotal[];
+  }>
 > {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, { action: 'getCommissionSettings' });
@@ -106,6 +111,35 @@ export async function setRestaurantOnlineRateAction(input: {
   await requireAdmin();
   return invokeEdgeFunction(FUNCTION_NAME, {
     action: 'setRestaurantOnlineRate',
+    restaurantId: input.restaurantId,
+    rate: input.rate,
+    expectedUpdatedAt: input.expectedUpdatedAt ?? null,
+  });
+}
+
+export async function updateGlobalPrivatizationRatesAction(input: {
+  croissanceRate: number;
+  liberteRate: number;
+  expectedUpdatedAt: string;
+}): Promise<ActionResult<CommissionUpdateResult>> {
+  await requireAdmin();
+  return invokeEdgeFunction(FUNCTION_NAME, {
+    action: 'updateGlobalPrivatizationRates',
+    croissanceRate: input.croissanceRate,
+    liberteRate: input.liberteRate,
+    expectedUpdatedAt: input.expectedUpdatedAt,
+  });
+}
+
+/** rate null : le restaurant suit de nouveau le taux de privatisation de son plan. */
+export async function setRestaurantPrivatizationRateAction(input: {
+  restaurantId: string;
+  rate: number | null;
+  expectedUpdatedAt: string | null;
+}): Promise<ActionResult<CommissionUpdateResult>> {
+  await requireAdmin();
+  return invokeEdgeFunction(FUNCTION_NAME, {
+    action: 'setRestaurantPrivatizationRate',
     restaurantId: input.restaurantId,
     rate: input.rate,
     expectedUpdatedAt: input.expectedUpdatedAt ?? null,

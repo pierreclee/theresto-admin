@@ -16,6 +16,7 @@ const baseCommission: RestaurantCommission = {
   suspended: false,
   invoices: [],
   onlineRate: null,
+  privatizationRate: null,
 };
 let mockCommission: RestaurantCommission = baseCommission;
 

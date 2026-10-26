@@ -83,3 +83,6 @@ export class CommissionMutationError extends Error {
     return this.code === 'failed-precondition';
   }
 }
+
+/** Avertissement d'un taux de 0 % sur la commission des privatisations. */
+export const PRIVATIZATION_ZERO_PERCENT_WARNING = 'Un taux de 0 % supprime toute commission sur les privatisations.';

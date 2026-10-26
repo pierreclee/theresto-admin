@@ -26,7 +26,9 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Restaurant } from '@/lib/types/restaurant';
-import { OnlineCommissionModal, onlineRateLabel } from './OnlineCommissionModal';
+import { OnlineCommissionModal } from './OnlineCommissionModal';
+import { PrivatizationCommissionModal } from './PrivatizationCommissionModal';
+import { planRateLabel } from './PlanRateModal';
 import { useRestaurantCommission } from '@/lib/hooks/useCommissionSettings';
 import { formatPercent } from '@/lib/utils/commissionRates';
 import { CommissionSection } from './CommissionSection';
@@ -258,7 +260,10 @@ function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boo
 export function RestaurantDetail({ restaurant }: Props) {
   const { data: commission, isError: commissionError } = useRestaurantCommission(restaurant.id);
   const onlineRate = commission?.onlineRate ?? null;
-  const [modal, setModal] = useState<'fee' | 'feeReset' | 'subscription' | 'approval' | 'edit' | null>(null);
+  const privatizationRate = commission?.privatizationRate ?? null;
+  const [modal, setModal] = useState<
+    'fee' | 'feeReset' | 'privatizationFee' | 'privatizationFeeReset' | 'subscription' | 'approval' | 'edit' | null
+  >(null);
 
   const formatCurrency = (v: number) =>
     v.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' });
@@ -557,7 +562,7 @@ export function RestaurantDetail({ restaurant }: Props) {
                 commissionError
                   ? 'Taux indisponible'
                   : onlineRate
-                    ? onlineRateLabel(onlineRate, commission?.subscriptionPlan ?? null)
+                    ? planRateLabel(onlineRate, commission?.subscriptionPlan ?? null)
                     : 'Chargement…'
               }
               onClick={() => onlineRate && setModal('fee')}
@@ -568,6 +573,26 @@ export function RestaurantDetail({ restaurant }: Props) {
                 label="Revenir au taux du plan"
                 sublabel={`Taux du plan : ${formatPercent(onlineRate.planRate)}`}
                 onClick={() => setModal('feeReset')}
+              />
+            )}
+            <ActionRow
+              icon={Percent}
+              label="Commission privatisations"
+              sublabel={
+                commissionError
+                  ? 'Taux indisponible'
+                  : privatizationRate
+                    ? planRateLabel(privatizationRate, commission?.subscriptionPlan ?? null)
+                    : 'Chargement…'
+              }
+              onClick={() => privatizationRate && setModal('privatizationFee')}
+            />
+            {privatizationRate?.custom != null && (
+              <ActionRow
+                icon={Percent}
+                label="Revenir au taux de privatisation du plan"
+                sublabel={`Taux du plan : ${formatPercent(privatizationRate.planRate)}`}
+                onClick={() => setModal('privatizationFeeReset')}
               />
             )}
             <ActionRow
@@ -585,6 +610,15 @@ export function RestaurantDetail({ restaurant }: Props) {
           restaurantId={restaurant.id}
           mode={modal === 'fee' ? 'edit' : 'reset'}
           onlineRate={onlineRate}
+          onClose={() => setModal(null)}
+        />
+      )}
+
+      {(modal === 'privatizationFee' || modal === 'privatizationFeeReset') && privatizationRate && (
+        <PrivatizationCommissionModal
+          restaurantId={restaurant.id}
+          mode={modal === 'privatizationFee' ? 'edit' : 'reset'}
+          privatizationRate={privatizationRate}
           onClose={() => setModal(null)}
         />
       )}
