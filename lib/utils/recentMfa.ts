@@ -35,3 +35,13 @@ export function hasRecentTotp(
       entry.method === 'totp' && typeof entry.timestamp === 'number' && nowSeconds - entry.timestamp <= maxAgeSeconds,
   );
 }
+
+/**
+ * Vrai si le jeton d'accès est de niveau AAL2 : le second facteur a été vérifié
+ * dans cette session. Exigé par requireAdmin pour toute action admin (RGPD-28).
+ * Le jeton doit avoir été validé auprès de Supabase (requireAdmin le passe à auth.getUser).
+ */
+export function hasAal2(accessToken: string | undefined | null): boolean {
+  if (!accessToken) return false;
+  return decodeClaims(accessToken)?.aal === 'aal2';
+}

@@ -62,6 +62,9 @@ export default function MFAEnrollmentPage() {
       const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
       if (challengeError) throw challengeError;
 
+      // Noté avant verify, qui notifie le contexte avant de rendre la main ; le
+      // contexte exige aussi une session AAL2 (RGPD-28).
+      localStorage.setItem('adminSessionStart', Date.now().toString());
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId,
         challengeId: challengeData.id,
@@ -69,8 +72,6 @@ export default function MFAEnrollmentPage() {
       });
       if (verifyError) throw verifyError;
 
-      localStorage.setItem('adminSessionStart', Date.now().toString());
-      localStorage.setItem('mfaVerified', 'true');
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Erreur de vérification');

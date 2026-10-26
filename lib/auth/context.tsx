@@ -34,8 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const hasMfaActual = !mfaError && (mfaData?.totp?.length > 0 || mfaData?.all?.length > 0);
         
         const hasMfaClaim = supabaseUser.app_metadata?.mfaEnrolled === true;
-        const hasMfaVerified = localStorage.getItem('mfaVerified') === 'true';
-        const hasMfa = hasMfaClaim || hasMfaActual || hasMfaVerified;
+        const hasMfa = hasMfaClaim || hasMfaActual;
 
         setAdminUser({
           uid: supabaseUser.id,
@@ -46,10 +45,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (isAdmin && hasMfa) {
+          // Le niveau réel de la session (claim aal du jeton) fait foi : une session
+          // AAL1 repasse par le challenge, quel que soit le contenu du localStorage.
+          const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
           const sessionStart = localStorage.getItem('adminSessionStart');
-          const isValid = sessionStart
+          const isValid = aal?.currentLevel === 'aal2' && (sessionStart
             ? Date.now() - parseInt(sessionStart) < 2 * 60 * 60 * 1000
-            : false;
+            : false);
           setSessionValid(isValid);
         } else {
           setSessionValid(false);
@@ -58,7 +60,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAdminUser(null);
         setSessionValid(false);
         localStorage.removeItem('adminSessionStart');
-        localStorage.removeItem('mfaVerified');
       }
 
       setUser(supabaseUser);
@@ -100,7 +101,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient();
     await supabase.auth.signOut();
     localStorage.removeItem('adminSessionStart');
-    localStorage.removeItem('mfaVerified');
   };
 
   if (!mounted) {

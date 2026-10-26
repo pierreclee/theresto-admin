@@ -36,7 +36,10 @@ export default function MFAChallengePage() {
       const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: totpFactor.id });
       if (challengeError) throw challengeError;
 
-      // 3. Verify the code against the challenge
+      // 3. Verify the code against the challenge. Le début de session est noté avant :
+      // verify notifie le contexte (MFA_CHALLENGE_VERIFIED) avant de rendre la main.
+      // Seul, il ne valide rien : le contexte exige aussi une session AAL2.
+      localStorage.setItem('adminSessionStart', Date.now().toString());
       const { error: verifyError } = await supabase.auth.mfa.verify({
         factorId: totpFactor.id,
         challengeId: challengeData.id,
@@ -45,10 +48,6 @@ export default function MFAChallengePage() {
 
       if (verifyError) throw verifyError;
 
-      // Ensure flags are updated and proceed
-      localStorage.setItem('mfaVerified', 'true');
-      localStorage.setItem('adminSessionStart', Date.now().toString());
-      
       router.push('/');
     } catch (err: any) {
       setError(err.message || 'Erreur de vérification MFA');

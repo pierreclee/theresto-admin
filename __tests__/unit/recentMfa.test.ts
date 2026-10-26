@@ -1,4 +1,4 @@
-import { hasRecentTotp, RECENT_MFA_MAX_AGE_SECONDS } from '@/lib/utils/recentMfa';
+import { hasAal2, hasRecentTotp, RECENT_MFA_MAX_AGE_SECONDS } from '@/lib/utils/recentMfa';
 
 function jwt(claims: Record<string, unknown>): string {
   const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
@@ -31,5 +31,18 @@ describe('hasRecentTotp', () => {
   it('refuse un jeton absent ou illisible', () => {
     expect(hasRecentTotp(undefined, NOW)).toBe(false);
     expect(hasRecentTotp('pas-un-jwt', NOW)).toBe(false);
+  });
+});
+
+describe('hasAal2', () => {
+  it('accepte une session AAL2, quel que soit l’âge du TOTP', () => {
+    expect(hasAal2(jwt({ aal: 'aal2', amr: [{ method: 'totp', timestamp: 1 }] }))).toBe(true);
+  });
+
+  it('refuse AAL1, un jeton absent ou illisible', () => {
+    expect(hasAal2(jwt({ aal: 'aal1' }))).toBe(false);
+    expect(hasAal2(undefined)).toBe(false);
+    expect(hasAal2(null)).toBe(false);
+    expect(hasAal2('pas-un-jwt')).toBe(false);
   });
 });
