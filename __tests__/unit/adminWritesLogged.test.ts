@@ -67,20 +67,40 @@ describe('écritures journalisées', () => {
   });
 
   it('suspension d un restaurant', async () => {
-    await expect(approveRestaurantAction('r1', 'suspended')).resolves.toEqual({ ok: true });
+    await expect(approveRestaurantAction('r1', 'suspended')).resolves.toEqual({ ok: true, auditLogged: true });
     expect(logged()).toEqual([expect.objectContaining({ action: 'suspend_restaurant', target_type: 'restaurant', target_id: 'r1' })]);
   });
 
+  it('suspension : journal en échec, auditLogged=false (écriture déjà faite)', async () => {
+    insert.mockResolvedValue({ error: { code: '42501' } });
+    await expect(approveRestaurantAction('r1', 'suspended')).resolves.toEqual({ ok: true, auditLogged: false });
+    expect(update).toHaveBeenCalled();
+  });
+
   it('modification d un restaurant : noms des champs seulement', async () => {
-    await updateRestaurantAction('r1', { name: 'Chez Paul', phone_number: '0600000000' } as never);
+    await expect(updateRestaurantAction('r1', { name: 'Chez Paul', phone_number: '0600000000' } as never))
+      .resolves.toEqual({ restaurant: { id: 'x' }, auditLogged: true });
     expect(logged()).toEqual([expect.objectContaining({
       action: 'update_restaurant', target_type: 'restaurant', target_id: 'r1', details: { fields: ['name', 'phone_number'] },
     })]);
     expect(JSON.stringify(logged())).not.toMatch(/Chez Paul|0600000000/);
   });
 
+  it('modification d un restaurant : journal en échec, auditLogged=false', async () => {
+    insert.mockResolvedValue({ error: { code: '42501' } });
+    await expect(updateRestaurantAction('r1', { name: 'Chez Paul' } as never))
+      .resolves.toEqual({ restaurant: { id: 'x' }, auditLogged: false });
+  });
+
+  it('configuration : journal en échec, auditLogged=false', async () => {
+    insert.mockResolvedValue({ error: { code: '42501' } });
+    await expect(updateConfigAction({ maintenanceMode: true } as never))
+      .resolves.toMatchObject({ auditLogged: false });
+  });
+
   it('configuration : valeurs non personnelles', async () => {
-    await updateConfigAction({ maintenanceMode: true } as never);
+    await expect(updateConfigAction({ maintenanceMode: true } as never))
+      .resolves.toMatchObject({ config: { currency: 'EUR' }, auditLogged: true });
     expect(upsert).toHaveBeenCalled();
     expect(logged()).toEqual([expect.objectContaining({
       action: 'update_platform_config', target_type: 'config', target_id: 'global', details: { maintenanceMode: true },

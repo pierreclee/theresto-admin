@@ -19,9 +19,13 @@ export function useUpdatePlatformConfig() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (updates: UpdatePlatformConfigInput) => adminApi.updateConfig(updates),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['platformConfig'], data);
-      toast('Configuration mise à jour');
+    onSuccess: ({ config, auditLogged }) => {
+      queryClient.setQueryData(['platformConfig'], config);
+      if (!auditLogged) {
+        toast("Configuration mise à jour, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast('Configuration mise à jour');
+      }
     },
     onError: () => toast('Erreur lors de la mise à jour', 'error'),
   });

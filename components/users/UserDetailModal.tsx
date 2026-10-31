@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { X, ShieldAlert, ChevronRight, Store, Phone, Calendar } from 'lucide-react';
 import type { AppUser, ModerationAction } from '@/lib/types/user';
 import { useUserCrmProfile, useModerateUser } from '@/lib/hooks/useUsers';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 import { ModerationBadge } from './ModerationBadge';
 import { RoleBadge } from './RoleBadge';
 import { ModerationModal } from './ModerationModal';
@@ -33,7 +34,7 @@ interface Props {
 export function UserDetailModal({ user, onClose }: Props) {
   const [showModerationModal, setShowModerationModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const { data: profile, isPending } = useUserCrmProfile(user.id);
+  const { data: profile, isPending, error: profileError } = useUserCrmProfile(user.id);
   const { mutateAsync: moderateUser } = useModerateUser();
 
   // Use fresh data from CRM profile when available (stays current after moderation)
@@ -151,6 +152,10 @@ export function UserDetailModal({ user, onClose }: Props) {
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="bg-gray-50 rounded-xl border border-gray-100 p-3 h-20" />
                 ))}
+              </div>
+            ) : profileError ? (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
+                {actionErrorMessage(profileError, 'Impossible de charger la fiche de cet utilisateur')}
               </div>
             ) : profile && (
               <>

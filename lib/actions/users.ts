@@ -7,13 +7,16 @@ import type { AppUser, UserCrmProfile, ModerationAction } from '@/lib/types/user
 const PAGE_SIZE = 50;
 
 import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
-import { logAdminAction, logAdminReadOrThrow } from '@/lib/audit/adminLog';
+import { adminLogRefusal, logAdminAction, type AdminLogRefusal } from '@/lib/audit/adminLog';
+
+// Consultation d'une donnée personnelle : refusée (résultat, pas exception) si le journal échoue (D2).
+type AdminRead<T> = { ok: true; data: T } | AdminLogRefusal;
 
 export async function listUsersAction(opts: {
   roleFilter?: string;
   statusFilter?: string;
   cursor?: number;
-}): Promise<{ users: AppUser[]; cursor: number | null }> {
+}): Promise<AdminRead<{ users: AppUser[]; cursor: number | null }>> {
   const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   
@@ -30,25 +33,28 @@ export async function listUsersAction(opts: {
   if (error) throw new Error(error.message);
   
   // Consultation journalisée (RGPD-29) : filtres et nombre de lignes, jamais les personnes.
-  await logAdminReadOrThrow(admin, {
+  const logged = await logAdminAction(admin, {
     action: 'list_users', targetType: 'user', targetId: null,
-    details: { statusFilter: opts.statusFilter ?? null, offset, count: data?.length ?? 0 },
+    details: { roleFilter: opts.roleFilter ?? null, statusFilter: opts.statusFilter ?? null, offset, count: data?.length ?? 0 },
   });
+  if (!logged) return adminLogRefusal();
 
   const users: AppUser[] = (data || []).map(toAppUser);
 
   const nextCursor = data?.length === PAGE_SIZE ? offset + PAGE_SIZE : null;
-  return { users, cursor: nextCursor };
+  return { ok: true, data: { users, cursor: nextCursor } };
 }
 
 // One user (restaurant owner link). Null when not found.
-export async function getUserAction(userId: string): Promise<AppUser | null> {
+export async function getUserAction(userId: string): Promise<AdminRead<AppUser | null>> {
   const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   const { data } = await adminDb.from('users').select('*').eq('id', userId).maybeSingle();
-  if (!data) return null;
-  await logAdminReadOrThrow(admin, { action: 'view_user', targetType: 'user', targetId: userId });
-  return toAppUser(data);
+  if (!data) return { ok: true, data: null };
+  if (!(await logAdminAction(admin, { action: 'view_user', targetType: 'user', targetId: userId }))) {
+    return adminLogRefusal();
+  }
+  return { ok: true, data: toAppUser(data) };
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,7 +77,7 @@ function toAppUser(d: any): AppUser {
   };
 }
 
-export async function getCrmProfileAction(userId: string): Promise<UserCrmProfile> {
+export async function getCrmProfileAction(userId: string): Promise<AdminRead<UserCrmProfile>> {
   const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   
@@ -84,7 +90,9 @@ export async function getCrmProfileAction(userId: string): Promise<UserCrmProfil
   ]);
   
   if (userRes.error) throw new Error(userRes.error.message);
-  await logAdminReadOrThrow(admin, { action: 'view_user_profile', targetType: 'user', targetId: userId });
+  if (!(await logAdminAction(admin, { action: 'view_user_profile', targetType: 'user', targetId: userId }))) {
+    return adminLogRefusal();
+  }
   
   const d = userRes.data;
   const user: AppUser = {
@@ -104,12 +112,12 @@ export async function getCrmProfileAction(userId: string): Promise<UserCrmProfil
     updatedAt: d.updated_at ? new Date(d.updated_at) : undefined,
   };
   
-  return {
+  return { ok: true, data: {
     user,
     stats: statsRes.data || { totalOrders: 0, totalSpent: 0, noShowCount: 0, averageRating: 0 },
     recentBookings: bookingsRes.data || [],
     favoriteRestaurants: (favoritesRes.data || []).map((f: any) => f.restaurant_id),
-  };
+  } };
 }
 
 export async function moderateUserAction(

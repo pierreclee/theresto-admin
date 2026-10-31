@@ -8,7 +8,7 @@ jest.mock('@/lib/supabase/server', () => ({
   getAdminClient: jest.fn(async () => ({ from: (table: string) => (table === 'platform_logs' ? { insert } : null) })),
 }));
 
-import { AdminLogError, logAdminAction, logAdminReadOrThrow } from '@/lib/audit/adminLog';
+import { ADMIN_LOG_FAILED_MESSAGE, adminLogRefusal, logAdminAction } from '@/lib/audit/adminLog';
 
 const admin = { id: 'admin-1', email: 'admin@theresto.fr' };
 
@@ -44,15 +44,8 @@ describe('logAdminAction', () => {
     await expect(logAdminAction(admin, { action: 'x', targetType: 'config' })).resolves.toBe(false);
   });
 
-  it('logAdminReadOrThrow refuse la lecture si le journal échoue (D2)', async () => {
-    insert.mockResolvedValue({ error: { code: '42501', message: 'denied' } });
-    await expect(logAdminReadOrThrow(admin, { action: 'view_user', targetType: 'user', targetId: 'u1' }))
-      .rejects.toBeInstanceOf(AdminLogError);
-  });
-
-  it('logAdminReadOrThrow laisse passer si le journal est écrit', async () => {
-    insert.mockResolvedValue({ error: null });
-    await expect(logAdminReadOrThrow(admin, { action: 'view_user', targetType: 'user', targetId: 'u1' }))
-      .resolves.toBeUndefined();
+  it('adminLogRefusal : refus typé de la consultation (D2), lisible en production', () => {
+    expect(adminLogRefusal()).toEqual({ ok: false, code: 'audit-log-failed', error: ADMIN_LOG_FAILED_MESSAGE });
+    expect(ADMIN_LOG_FAILED_MESSAGE).toMatch(/^Consultation impossible : le journal d'administration n'a pas pu être écrit/);
   });
 });

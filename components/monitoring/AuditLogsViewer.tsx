@@ -74,8 +74,9 @@ export function AuditLogsViewer() {
   const { data, isPending } = useAuditLogs({
     limit: LIMIT,
     offset,
-    startDate: startInput ? new Date(startInput) : undefined,
-    endDate: endInput ? new Date(endInput) : undefined,
+    // Jours « AAAA-MM-JJ » des champs date, lus comme des jours de Paris par le serveur.
+    startDate: startInput || undefined,
+    endDate: endInput || undefined,
   });
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 0;

@@ -22,13 +22,18 @@ export interface AdminActor {
 export const ADMIN_LOG_FAILED_MESSAGE =
   "Consultation impossible : le journal d'administration n'a pas pu être écrit. Réessayez.";
 
-export class AdminLogError extends Error {
-  readonly code = 'audit-log-failed';
+/**
+ * Refus d'une consultation faute de journal (D2). Renvoyé, jamais levé : Next.js masque en
+ * production le message d'une exception levée par une Server Action.
+ */
+export interface AdminLogRefusal {
+  ok: false;
+  code: 'audit-log-failed';
+  error: string;
+}
 
-  constructor() {
-    super(ADMIN_LOG_FAILED_MESSAGE);
-    this.name = 'AdminLogError';
-  }
+export function adminLogRefusal(): AdminLogRefusal {
+  return { ok: false, code: 'audit-log-failed', error: ADMIN_LOG_FAILED_MESSAGE };
 }
 
 /** Écrit la ligne ; false si l'écriture échoue (jamais d'exception). */
@@ -49,9 +54,4 @@ export async function logAdminAction(admin: AdminActor, entry: AdminLogEntry): P
     console.error(`[admin-log] ${entry.action} non journalisé :`, e instanceof Error ? e.name : 'erreur');
     return false;
   }
-}
-
-/** Consultation d'une donnée personnelle : refusée si elle ne peut pas être journalisée (D2). */
-export async function logAdminReadOrThrow(admin: AdminActor, entry: AdminLogEntry): Promise<void> {
-  if (!(await logAdminAction(admin, entry))) throw new AdminLogError();
 }

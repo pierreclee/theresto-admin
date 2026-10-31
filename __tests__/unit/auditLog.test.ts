@@ -21,7 +21,7 @@ jest.mock('@/lib/supabase/server', () => ({
 }));
 
 import { getAuditLogsAction } from '@/lib/actions/admin';
-import { dayAfter, PLATFORM_LOG_COLUMNS, toAuditLog } from '@/lib/utils/auditLog';
+import { PLATFORM_LOG_COLUMNS, parisDayStart, toAuditLog } from '@/lib/utils/auditLog';
 
 const row = {
   id: 'l1', action: 'retry_privatization_refund', performed_by: 'admin-1',
@@ -51,8 +51,21 @@ describe('toAuditLog', () => {
     expect(PLATFORM_LOG_COLUMNS).not.toMatch(/event_type|actor_id|ip_address/);
   });
 
-  it('dayAfter : fin exclusive du filtre « au »', () => {
-    expect(dayAfter(new Date('2026-11-03T00:00:00.000Z')).toISOString()).toBe('2026-11-04T00:00:00.000Z');
+  it('parisDayStart : minuit à Paris, heure d hiver et d été', () => {
+    expect(parisDayStart('2026-11-03')?.toISOString()).toBe('2026-11-02T23:00:00.000Z');
+    expect(parisDayStart('2026-07-14')?.toISOString()).toBe('2026-07-13T22:00:00.000Z');
+    // Jours de changement d'heure : minuit est encore à l'ancienne heure
+    expect(parisDayStart('2026-03-29')?.toISOString()).toBe('2026-03-28T23:00:00.000Z');
+    expect(parisDayStart('2026-10-25')?.toISOString()).toBe('2026-10-24T22:00:00.000Z');
+  });
+
+  it('parisDayStart : jour suivant, et null si la date est invalide', () => {
+    expect(parisDayStart('2026-11-03', 1)?.toISOString()).toBe('2026-11-03T23:00:00.000Z');
+    expect(parisDayStart('2026-12-31', 1)?.toISOString()).toBe('2026-12-31T23:00:00.000Z');
+    expect(parisDayStart('2026-10-24', 1)?.toISOString()).toBe('2026-10-24T22:00:00.000Z');
+    expect(parisDayStart('03/11/2026')).toBeNull();
+    expect(parisDayStart('2026-02-30')).toBeNull();
+    expect(parisDayStart('')).toBeNull();
   });
 });
 
@@ -65,9 +78,9 @@ describe('getAuditLogsAction', () => {
     result.error = null;
   });
 
-  it('lit platform_logs avec dates, page et tri', async () => {
+  it('lit platform_logs avec dates (jours de Paris), page et tri', async () => {
     await getAuditLogsAction({
-      startDate: new Date('2026-11-01T00:00:00.000Z'), endDate: new Date('2026-11-03T00:00:00.000Z'),
+      startDate: '2026-11-01', endDate: '2026-11-03',
       limit: 50, offset: 100, resourceType: 'user', adminId: 'admin-1',
     });
     expect(from).toHaveBeenCalledWith('platform_logs');
@@ -75,8 +88,8 @@ describe('getAuditLogsAction', () => {
       ['select', [PLATFORM_LOG_COLUMNS, { count: 'exact' }]],
       ['eq', ['target_type', 'user']],
       ['eq', ['performed_by', 'admin-1']],
-      ['gte', ['created_at', '2026-11-01T00:00:00.000Z']],
-      ['lt', ['created_at', '2026-11-04T00:00:00.000Z']],
+      ['gte', ['created_at', '2026-10-31T23:00:00.000Z']],
+      ['lt', ['created_at', '2026-11-03T23:00:00.000Z']],
       ['order', ['created_at', { ascending: false }]],
       ['range', [100, 149]],
     ]));
@@ -88,5 +101,16 @@ describe('getAuditLogsAction', () => {
     const out = await getAuditLogsAction({ limit: 10_000, offset: -5 });
     expect(calls).toEqual(expect.arrayContaining([['range', [0, 199]]]));
     expect(out).toEqual({ logs: [toAuditLog(row)], total: 1 });
+  });
+
+  it('page et dates non numériques ou invalides : valeurs par défaut, aucun filtre', async () => {
+    await getAuditLogsAction({ limit: Number.NaN, offset: 'abc' as never, startDate: 'n importe quoi', endDate: '' });
+    expect(calls).toEqual(expect.arrayContaining([['range', [0, 49]]]));
+    expect(calls.some(([m]) => m === 'gte' || m === 'lt')).toBe(false);
+  });
+
+  it('offset et limit non entiers arrondis', async () => {
+    await getAuditLogsAction({ limit: 10.7, offset: 20.2 });
+    expect(calls).toEqual(expect.arrayContaining([['range', [20, 29]]]));
   });
 });

@@ -12,8 +12,11 @@ import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/serve
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import { hasRecentTotp, RECENT_MFA_REQUIRED_MESSAGE } from '@/lib/utils/recentMfa';
 import { normalizeSubscriptionPlan, type SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
-import { ADMIN_LOG_FAILED_MESSAGE, logAdminAction, logAdminReadOrThrow } from '@/lib/audit/adminLog';
-import { dayAfter, PLATFORM_LOG_COLUMNS, toAuditLog, type PlatformLogRow } from '@/lib/utils/auditLog';
+import { ADMIN_LOG_FAILED_MESSAGE, adminLogRefusal, logAdminAction, type AdminLogRefusal } from '@/lib/audit/adminLog';
+import { parisDayStart, PLATFORM_LOG_COLUMNS, toAuditLog, type PlatformLogRow } from '@/lib/utils/auditLog';
+
+// Consultation d'une donnée personnelle : refusée (résultat, pas exception) si le journal échoue (D2).
+type AdminRead<T> = { ok: true; data: T } | AdminLogRefusal;
 
 export async function getStatsAction(): Promise<PlatformStats> {
   await requireAdmin();
@@ -54,7 +57,7 @@ export async function getRestaurantsAction(filters?: {
   search?: string;
   limit?: number;
   offset?: number;
-}): Promise<{ restaurants: Restaurant[]; total: number }> {
+}): Promise<AdminRead<{ restaurants: Restaurant[]; total: number }>> {
   const admin = await requireAdmin();
   const adminDb = await getAdminClient();
 
@@ -78,25 +81,28 @@ export async function getRestaurantsAction(filters?: {
   if (error) throw new Error(error.message);
   // Consultation journalisée (RGPD-29) : filtres et nombre de lignes. Le texte cherché peut
   // être un nom : seule sa présence est notée.
-  await logAdminReadOrThrow(admin, {
+  const logged = await logAdminAction(admin, {
     action: 'list_restaurants', targetType: 'restaurant', targetId: null,
     details: {
       status: filters?.status ?? null, subscription: filters?.subscription ?? null,
       search: !!filters?.search, offset: filters?.offset ?? 0, count: data?.length ?? 0,
     },
   });
+  if (!logged) return adminLogRefusal();
 
   // Transform data as necessary based on DB structure
-  return { restaurants: (data as any) || [], total: count || 0 };
+  return { ok: true, data: { restaurants: (data as any) || [], total: count || 0 } };
 }
 
-export async function getRestaurantDetailAction(restaurantId: string): Promise<Restaurant> {
+export async function getRestaurantDetailAction(restaurantId: string): Promise<AdminRead<Restaurant>> {
   const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   const { data, error } = await adminDb.from('restaurants').select('*').eq('id', restaurantId).single();
   if (error) throw new Error(error.message);
-  await logAdminReadOrThrow(admin, { action: 'view_restaurant', targetType: 'restaurant', targetId: restaurantId });
-  return data as any;
+  if (!(await logAdminAction(admin, { action: 'view_restaurant', targetType: 'restaurant', targetId: restaurantId }))) {
+    return adminLogRefusal();
+  }
+  return { ok: true, data: data as any };
 }
 
 // Signed URL (5 min) to the Kbis, stored in the private onboarding-docs
@@ -130,7 +136,11 @@ export async function getKbisUrlAction(
   return { ok: true, url: signed.signedUrl };
 }
 
-export async function updateRestaurantAction(restaurantId: string, updates: UpdateRestaurantInput): Promise<Restaurant> {
+/** auditLogged=false si l'écriture du journal échoue (la modification est alors déjà faite, D2). */
+export async function updateRestaurantAction(
+  restaurantId: string,
+  updates: UpdateRestaurantInput,
+): Promise<{ restaurant: Restaurant; auditLogged: boolean }> {
   const admin = await requireAdmin();
   // Liste blanche d'exécution : la commission passe uniquement par l'Edge Function commission-settings (TOTP).
   const { allowed, ignored } = pickAllowedRestaurantUpdates(updates);
@@ -144,23 +154,24 @@ export async function updateRestaurantAction(restaurantId: string, updates: Upda
   const { data, error } = await adminDb.from('restaurants').update(allowed).eq('id', restaurantId).select().single();
   if (error) throw new Error(error.message);
   // Noms des champs seulement : nom, e-mail, téléphone et adresse sont des données personnelles.
-  await logAdminAction(admin, {
+  const auditLogged = await logAdminAction(admin, {
     action: 'update_restaurant', targetType: 'restaurant', targetId: restaurantId,
     details: { fields: Object.keys(allowed) },
   });
-  return data as any;
+  return { restaurant: data as any, auditLogged };
 }
 
 // Approval and refusal go through the admin-onboarding Edge Function (status
 // update + owner email), with the admin's own session: the function checks
 // the admin claim. Suspension is a plain status update.
 // Errors are returned, not thrown: production hides thrown messages.
+// Suspension : auditLogged=false si le journal n'a pas pu être écrit (statut déjà changé, D2).
 export async function approveRestaurantAction(
   restaurantId: string,
   status: 'approved' | 'rejected' | 'suspended',
   reason?: string,
   correctionMode?: 'correction_required' | 'permanent'
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; auditLogged?: boolean } | { ok: false; error: string }> {
   const admin = await requireAdmin();
 
   if (status === 'suspended') {
@@ -169,8 +180,8 @@ export async function approveRestaurantAction(
       .update({ approval_status: 'suspended', updated_at: new Date().toISOString() })
       .eq('id', restaurantId);
     if (error) return { ok: false, error: error.message };
-    await logAdminAction(admin, { action: 'suspend_restaurant', targetType: 'restaurant', targetId: restaurantId });
-    return { ok: true };
+    const auditLogged = await logAdminAction(admin, { action: 'suspend_restaurant', targetType: 'restaurant', targetId: restaurantId });
+    return { ok: true, auditLogged };
   }
   // Approbation et refus : journalisés par l'Edge Function admin-onboarding.
 
@@ -235,16 +246,20 @@ export async function updateSubscriptionPlanAction(
 export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
-  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
-  const offset = Math.max(filters.offset ?? 0, 0);
+  // Valeurs venues du navigateur : non numériques → valeurs par défaut.
+  const limit = Number.isFinite(filters.limit) ? Math.min(Math.max(Math.floor(filters.limit!), 1), 200) : 50;
+  const offset = Number.isFinite(filters.offset) ? Math.max(Math.floor(filters.offset!), 0) : 0;
+  // Jours de Paris (« AAAA-MM-JJ ») ; « au » inclus : fin exclusive au minuit suivant.
+  const start = typeof filters.startDate === 'string' ? parisDayStart(filters.startDate) : null;
+  const end = typeof filters.endDate === 'string' ? parisDayStart(filters.endDate, 1) : null;
 
   // Journal d'administration (RGPD-29) : platform_logs, seule table écrite (audit_logs supprimée au lot 9).
   let query = adminDb.from('platform_logs').select(PLATFORM_LOG_COLUMNS, { count: 'exact' });
   if (filters.action) query = query.eq('action', filters.action);
   if (filters.resourceType) query = query.eq('target_type', filters.resourceType);
   if (filters.adminId) query = query.eq('performed_by', filters.adminId);
-  if (filters.startDate) query = query.gte('created_at', new Date(filters.startDate).toISOString());
-  if (filters.endDate) query = query.lt('created_at', dayAfter(new Date(filters.endDate)).toISOString());
+  if (start) query = query.gte('created_at', start.toISOString());
+  if (end) query = query.lt('created_at', end.toISOString());
   query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
   const { data, count, error } = await query;
@@ -267,7 +282,10 @@ export async function getConfigAction(): Promise<PlatformConfig> {
   };
 }
 
-export async function updateConfigAction(updates: UpdatePlatformConfigInput): Promise<PlatformConfig> {
+/** auditLogged=false si l'écriture du journal échoue (la configuration est alors déjà modifiée, D2). */
+export async function updateConfigAction(
+  updates: UpdatePlatformConfigInput,
+): Promise<{ config: PlatformConfig; auditLogged: boolean }> {
   const user = await requireAdmin();
   const { allowed, ignored } = pickAllowedConfigUpdates(updates);
   if (ignored.length > 0) {
@@ -287,15 +305,18 @@ export async function updateConfigAction(updates: UpdatePlatformConfigInput): Pr
   const { data, error } = await adminDb.from('app_config').upsert({ id: 'global', ...payload }).select().single();
   if (error) throw new Error(error.message);
   // Liste blanche pickAllowedConfigUpdates (devise, mode maintenance) : valeurs non personnelles.
-  await logAdminAction(user, {
+  const auditLogged = await logAdminAction(user, {
     action: 'update_platform_config', targetType: 'config', targetId: 'global',
     details: { ...allowed },
   });
-  
+
   return {
-    currency: data?.currency ?? 'EUR',
-    maintenanceMode: data?.maintenance_mode ?? false,
-    updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
-    updatedBy: data?.updated_by,
+    config: {
+      currency: data?.currency ?? 'EUR',
+      maintenanceMode: data?.maintenance_mode ?? false,
+      updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
+      updatedBy: data?.updated_by,
+    },
+    auditLogged,
   };
 }

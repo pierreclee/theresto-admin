@@ -31,10 +31,14 @@ export function useUpdateRestaurant() {
   return useMutation({
     mutationFn: ({ restaurantId, updates }: { restaurantId: string; updates: UpdateRestaurantInput }) =>
       adminApi.updateRestaurant(restaurantId, updates),
-    onSuccess: (data) => {
+    onSuccess: ({ restaurant, auditLogged }) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
-      queryClient.setQueryData(['restaurant', data.id], data);
-      toast('Restaurant mis à jour');
+      queryClient.setQueryData(['restaurant', restaurant.id], restaurant);
+      if (!auditLogged) {
+        toast("Restaurant mis à jour, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast('Restaurant mis à jour');
+      }
     },
     onError: () => toast('Erreur lors de la mise à jour', 'error'),
   });
@@ -59,11 +63,16 @@ export function useApproveRestaurant() {
       if (!result.ok) throw new Error(result.error);
       return result;
     },
-    onSuccess: (_, vars) => {
+    onSuccess: (result, vars) => {
       queryClient.invalidateQueries({ queryKey: ['restaurants'] });
       queryClient.invalidateQueries({ queryKey: ['restaurant', vars.restaurantId] });
       queryClient.invalidateQueries({ queryKey: ['platformStats'] });
-      toast('Statut du restaurant mis à jour');
+      // Suspension : écrite par l'admin, journal en échec signalé (approbation et refus : Edge Function).
+      if (result.auditLogged === false) {
+        toast("Statut mis à jour, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast('Statut du restaurant mis à jour');
+      }
     },
     onError: (error) => toast(`Erreur lors de la mise à jour du statut : ${error.message}`, 'error'),
   });

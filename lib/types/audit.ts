@@ -11,8 +11,10 @@ export interface AuditLog {
 }
 
 export interface AuditLogFilter {
-  startDate?: Date;
-  endDate?: Date;
+  /** Jour de Paris « AAAA-MM-JJ » (inclus). */
+  startDate?: string;
+  /** Jour de Paris « AAAA-MM-JJ » (inclus). */
+  endDate?: string;
   adminId?: string;
   action?: string;
   resourceType?: string;

@@ -30,7 +30,30 @@ export function toAuditLog(row: PlatformLogRow): AuditLog {
   };
 }
 
-/** Fin exclusive d'un filtre « au <jour> » : le lendemain à la même heure. */
-export function dayAfter(date: Date): Date {
-  return new Date(date.getTime() + 24 * 60 * 60 * 1000);
+const PARIS_PARTS = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'Europe/Paris', hourCycle: 'h23',
+  year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+});
+
+/** Écart (ms) entre l'heure de Paris et UTC à l'instant donné. */
+function parisOffsetMs(instant: number): number {
+  const p = Object.fromEntries(PARIS_PARTS.formatToParts(new Date(instant)).map((x) => [x.type, Number(x.value)]));
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - instant;
+}
+
+/**
+ * Minuit à Paris du jour `day` (« AAAA-MM-JJ », valeur d'un <input type="date">), décalé de
+ * `addDays` jours. Les filtres « du / au » de l'écran Monitoring sont des jours de Paris.
+ * null si la date est invalide.
+ */
+export function parisDayStart(day: string, addDays = 0): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const check = new Date(Date.UTC(y, mo - 1, d));
+  if (check.getUTCFullYear() !== y || check.getUTCMonth() !== mo - 1 || check.getUTCDate() !== d) return null;
+  const wall = Date.UTC(y, mo - 1, d + addDays);
+  // Deux passes : l'écart peut changer entre minuit UTC et minuit à Paris (changement d'heure).
+  const first = wall - parisOffsetMs(wall);
+  return new Date(wall - parisOffsetMs(first));
 }
