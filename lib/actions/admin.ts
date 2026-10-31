@@ -12,6 +12,7 @@ import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/serve
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import { hasRecentTotp, RECENT_MFA_REQUIRED_MESSAGE } from '@/lib/utils/recentMfa';
 import { normalizeSubscriptionPlan, type SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
+import { ADMIN_LOG_FAILED_MESSAGE, logAdminAction, logAdminReadOrThrow } from '@/lib/audit/adminLog';
 import { dayAfter, PLATFORM_LOG_COLUMNS, toAuditLog, type PlatformLogRow } from '@/lib/utils/auditLog';
 
 export async function getStatsAction(): Promise<PlatformStats> {
@@ -54,7 +55,7 @@ export async function getRestaurantsAction(filters?: {
   limit?: number;
   offset?: number;
 }): Promise<{ restaurants: Restaurant[]; total: number }> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
 
   let query = adminDb.from('restaurants').select('*', { count: 'exact' });
@@ -75,16 +76,26 @@ export async function getRestaurantsAction(filters?: {
 
   const { data, count, error } = await query;
   if (error) throw new Error(error.message);
+  // Consultation journalisée (RGPD-29) : filtres et nombre de lignes. Le texte cherché peut
+  // être un nom : seule sa présence est notée.
+  await logAdminReadOrThrow(admin, {
+    action: 'list_restaurants', targetType: 'restaurant', targetId: null,
+    details: {
+      status: filters?.status ?? null, subscription: filters?.subscription ?? null,
+      search: !!filters?.search, offset: filters?.offset ?? 0, count: data?.length ?? 0,
+    },
+  });
 
   // Transform data as necessary based on DB structure
   return { restaurants: (data as any) || [], total: count || 0 };
 }
 
 export async function getRestaurantDetailAction(restaurantId: string): Promise<Restaurant> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   const { data, error } = await adminDb.from('restaurants').select('*').eq('id', restaurantId).single();
   if (error) throw new Error(error.message);
+  await logAdminReadOrThrow(admin, { action: 'view_restaurant', targetType: 'restaurant', targetId: restaurantId });
   return data as any;
 }
 
@@ -93,7 +104,7 @@ export async function getRestaurantDetailAction(restaurantId: string): Promise<R
 export async function getKbisUrlAction(
   restaurantId: string,
 ): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
 
   const { data, error } = await adminDb
@@ -105,6 +116,10 @@ export async function getKbisUrlAction(
 
   const path: string | null = data?.kbis_path ?? null;
   if (!path) return { ok: false, error: 'Aucun Kbis déposé' };
+  // Kbis = identité, date et lieu de naissance du dirigeant : pas de lien sans ligne au journal (RGPD-29, D2).
+  if (!(await logAdminAction(admin, { action: 'view_kbis', targetType: 'kbis', targetId: restaurantId }))) {
+    return { ok: false, error: ADMIN_LOG_FAILED_MESSAGE };
+  }
   // Former uploads were public URLs
   if (path.startsWith('http')) return { ok: true, url: path };
 

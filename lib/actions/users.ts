@@ -7,13 +7,14 @@ import type { AppUser, UserCrmProfile, ModerationAction } from '@/lib/types/user
 const PAGE_SIZE = 50;
 
 import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
+import { logAdminReadOrThrow } from '@/lib/audit/adminLog';
 
 export async function listUsersAction(opts: {
   roleFilter?: string;
   statusFilter?: string;
   cursor?: number;
 }): Promise<{ users: AppUser[]; cursor: number | null }> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   
   let query = adminDb.from('users').select('*');
@@ -28,6 +29,12 @@ export async function listUsersAction(opts: {
   const { data, error } = await query;
   if (error) throw new Error(error.message);
   
+  // Consultation journalisée (RGPD-29) : filtres et nombre de lignes, jamais les personnes.
+  await logAdminReadOrThrow(admin, {
+    action: 'list_users', targetType: 'user', targetId: null,
+    details: { statusFilter: opts.statusFilter ?? null, offset, count: data?.length ?? 0 },
+  });
+
   const users: AppUser[] = (data || []).map(toAppUser);
 
   const nextCursor = data?.length === PAGE_SIZE ? offset + PAGE_SIZE : null;
@@ -36,10 +43,12 @@ export async function listUsersAction(opts: {
 
 // One user (restaurant owner link). Null when not found.
 export async function getUserAction(userId: string): Promise<AppUser | null> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   const { data } = await adminDb.from('users').select('*').eq('id', userId).maybeSingle();
-  return data ? toAppUser(data) : null;
+  if (!data) return null;
+  await logAdminReadOrThrow(admin, { action: 'view_user', targetType: 'user', targetId: userId });
+  return toAppUser(data);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,7 +72,7 @@ function toAppUser(d: any): AppUser {
 }
 
 export async function getCrmProfileAction(userId: string): Promise<UserCrmProfile> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   
   // Example dummy aggregation
@@ -75,6 +84,7 @@ export async function getCrmProfileAction(userId: string): Promise<UserCrmProfil
   ]);
   
   if (userRes.error) throw new Error(userRes.error.message);
+  await logAdminReadOrThrow(admin, { action: 'view_user_profile', targetType: 'user', targetId: userId });
   
   const d = userRes.data;
   const user: AppUser = {
