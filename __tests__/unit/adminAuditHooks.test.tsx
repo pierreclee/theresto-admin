@@ -15,6 +15,10 @@ import { useApproveRestaurant, useRestaurantDetail, useUpdateRestaurant } from '
 import { useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { useUserCrmProfile } from '@/lib/hooks/useUsers';
 import { ActionError, actionErrorMessage } from '@/lib/api/actionResult';
+import { getStripeOverviewAction } from '@/lib/actions/billing';
+import { listPrivatizationIncidentsAction } from '@/lib/actions/privatizationIncidents';
+import { useStripeOverview } from '@/lib/hooks/useBilling';
+import { usePrivatizationIncidents } from '@/lib/hooks/usePrivatizationIncidents';
 
 jest.mock('@/lib/actions/admin', () => ({
   approveRestaurantAction: jest.fn(),
@@ -23,6 +27,17 @@ jest.mock('@/lib/actions/admin', () => ({
   updateRestaurantAction: jest.fn(),
 }));
 jest.mock('@/lib/actions/users', () => ({ getCrmProfileAction: jest.fn() }));
+jest.mock('@/lib/actions/billing', () => ({
+  getStripeOverviewAction: jest.fn(),
+  getRevenueSummaryAction: jest.fn(),
+  backfillPlatformRevenueAction: jest.fn(),
+}));
+jest.mock('@/lib/actions/privatizationIncidents', () => ({
+  listPrivatizationIncidentsAction: jest.fn(),
+  resolvePrivatizationIncidentAction: jest.fn(),
+  retryPrivatizationRefundAction: jest.fn(),
+  returnPrivatizationCustomerBalanceAction: jest.fn(),
+}));
 jest.mock('@/lib/auth/verifyTotp', () => ({ verifyTotpCode: jest.fn() }));
 const toast = jest.fn();
 jest.mock('@/components/shared/Toaster', () => ({ useToast: () => toast }));
@@ -63,8 +78,15 @@ describe('écritures : auditLogged=false signalé', () => {
     expect(toast).toHaveBeenCalledWith(NOT_LOGGED, 'error');
   });
 
-  it('approbation (journal tenu par l Edge Function) : toast normal', async () => {
-    (approveRestaurantAction as jest.Mock).mockResolvedValue({ ok: true });
+  it('approbation non journalisée par l Edge Function admin-onboarding', async () => {
+    (approveRestaurantAction as jest.Mock).mockResolvedValue({ ok: true, auditLogged: false });
+    const { result } = renderHook(() => useApproveRestaurant(), { wrapper });
+    await act(() => result.current.mutateAsync({ restaurantId: 'r1', status: 'approved' }));
+    expect(toast).toHaveBeenCalledWith(NOT_LOGGED, 'error');
+  });
+
+  it('approbation journalisée par l Edge Function : toast normal', async () => {
+    (approveRestaurantAction as jest.Mock).mockResolvedValue({ ok: true, auditLogged: true });
     const { result } = renderHook(() => useApproveRestaurant(), { wrapper });
     await act(() => result.current.mutateAsync({ restaurantId: 'r1', status: 'approved' }));
     expect(toast).toHaveBeenCalledWith('Statut du restaurant mis à jour');
@@ -91,6 +113,20 @@ describe('consultations refusées faute de journal : message lisible', () => {
     const { result } = renderHook(() => useUserCrmProfile('u1'), { wrapper });
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(actionErrorMessage(result.current.error, 'x')).toBe(REFUSED.error);
+  });
+
+  it('fiche Stripe du restaurant (admin-restaurant-billing)', async () => {
+    (getStripeOverviewAction as jest.Mock).mockResolvedValue(REFUSED);
+    const { result } = renderHook(() => useStripeOverview('r1'), { wrapper });
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error?.message).toBe(REFUSED.error);
+  });
+
+  it('liste des incidents de privatisation', async () => {
+    (listPrivatizationIncidentsAction as jest.Mock).mockResolvedValue(REFUSED);
+    const { result } = renderHook(() => usePrivatizationIncidents('open'), { wrapper });
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error?.message).toBe(REFUSED.error);
   });
 
   it('actionErrorMessage : message de l action, sinon texte de repli (message serveur masqué)', () => {

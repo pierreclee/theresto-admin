@@ -165,7 +165,8 @@ export async function updateRestaurantAction(
 // update + owner email), with the admin's own session: the function checks
 // the admin claim. Suspension is a plain status update.
 // Errors are returned, not thrown: production hides thrown messages.
-// Suspension : auditLogged=false si le journal n'a pas pu être écrit (statut déjà changé, D2).
+// auditLogged=false si le journal n'a pas pu être écrit (statut déjà changé, D2) : écrit ici
+// pour la suspension, renvoyé par l'Edge Function admin-onboarding pour l'approbation et le refus.
 export async function approveRestaurantAction(
   restaurantId: string,
   status: 'approved' | 'rejected' | 'suspended',
@@ -186,7 +187,7 @@ export async function approveRestaurantAction(
   // Approbation et refus : journalisés par l'Edge Function admin-onboarding.
 
   const supabase = await createClient();
-  const { error } = await supabase.functions.invoke('admin-onboarding', {
+  const { data, error } = await supabase.functions.invoke('admin-onboarding', {
     body: status === 'approved'
       ? { action: 'approveOnboardingRestaurant', restaurantId }
       : { action: 'rejectOnboardingRestaurant', restaurantId, reason, correctionMode },
@@ -199,7 +200,7 @@ export async function approveRestaurantAction(
     }
     return { ok: false, error: message };
   }
-  return { ok: true };
+  return { ok: true, auditLogged: data?.data?.auditLogged !== false };
 }
 
 const SUBSCRIPTION_PLAN_KEYS: readonly SubscriptionPlanKey[] = ['essentiel', 'croissance', 'liberte', 'premium'];
@@ -255,8 +256,10 @@ export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ log
 
   // Journal d'administration (RGPD-29) : platform_logs, seule table écrite (audit_logs supprimée au lot 9).
   let query = adminDb.from('platform_logs').select(PLATFORM_LOG_COLUMNS, { count: 'exact' });
-  if (filters.action) query = query.eq('action', filters.action);
-  if (filters.resourceType) query = query.eq('target_type', filters.resourceType);
+  if (typeof filters.action === 'string' && filters.action) query = query.eq('action', filters.action);
+  if (typeof filters.resourceType === 'string' && filters.resourceType) {
+    query = query.eq('target_type', filters.resourceType);
+  }
   if (filters.adminId) query = query.eq('performed_by', filters.adminId);
   if (start) query = query.gte('created_at', start.toISOString());
   if (end) query = query.lt('created_at', end.toISOString());

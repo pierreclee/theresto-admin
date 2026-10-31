@@ -15,6 +15,12 @@ function billingReadErrorMessage(code: string | undefined, fallback: string): st
   return fallback;
 }
 
+/** Erreur d'une lecture : le refus faute de journal (RGPD-29, D2) garde son message. */
+function billingReadError(result: { code?: string; error: string } | null, fallback: string): Error {
+  if (result?.code === 'audit-log-failed') return new Error(result.error);
+  return new Error(billingReadErrorMessage(result?.code, fallback));
+}
+
 function logReadFailure(error: unknown): null {
   console.error('[billing] lecture impossible', error);
   return null;
@@ -26,7 +32,7 @@ export function useStripeOverview(restaurantId: string) {
     queryFn: async () => {
       const result = await getStripeOverviewAction(restaurantId).catch(logReadFailure);
       if (!result?.ok) {
-        throw new Error(billingReadErrorMessage(result?.code, 'Impossible de lire les données Stripe.'));
+        throw billingReadError(result, 'Impossible de lire les données Stripe.');
       }
       return result.data;
     },
@@ -43,7 +49,7 @@ export function useRevenueSummary(restaurantId: string) {
     queryFn: async () => {
       const result = await getRevenueSummaryAction(restaurantId).catch(logReadFailure);
       if (!result?.ok) {
-        throw new Error(billingReadErrorMessage(result?.code, 'Impossible de charger les revenus.'));
+        throw billingReadError(result, 'Impossible de charger les revenus.');
       }
       return result.data;
     },

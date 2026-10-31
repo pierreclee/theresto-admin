@@ -35,6 +35,8 @@ export function usePrivatizationIncidents(status: PrivatizationIncidentFilter) {
         return null;
       });
       if (!result?.ok) {
+        // Liste refusée faute de journal (RGPD-29, D2) : message tel quel.
+        if (result?.code === 'audit-log-failed') throw new Error(result.error);
         throw new Error(
           result?.code === 'unauthenticated'
             ? 'Session expirée. Reconnectez-vous puis rechargez la page.'

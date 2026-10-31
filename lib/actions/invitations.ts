@@ -13,6 +13,11 @@ export type InviteRestaurantOwnerResult =
       hasAccount: boolean;
       /** False when the staging guard blocked the email (non-whitelisted domain). */
       emailSent: boolean;
+      /**
+       * Journal d'administration (RGPD-29) écrit par l'Edge Function admin-onboarding
+       * (create_restaurant_invitation) ; false : invitation faite, journal en échec (D2).
+       */
+      auditLogged?: boolean;
     }
   | { ok: false; error: string };
 

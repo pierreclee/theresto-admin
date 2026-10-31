@@ -21,7 +21,10 @@ jest.mock('@/lib/supabase/server', () => ({
 }));
 
 import { getAuditLogsAction } from '@/lib/actions/admin';
-import { PLATFORM_LOG_COLUMNS, parisDayStart, toAuditLog } from '@/lib/utils/auditLog';
+import {
+  AUDIT_ACTION_LABELS, AUDIT_ACTION_OPTIONS, AUDIT_RESOURCE_LABELS, AUDIT_RESOURCE_OPTIONS,
+  PLATFORM_LOG_COLUMNS, formatAuditDetails, parisDayStart, toAuditLog,
+} from '@/lib/utils/auditLog';
 
 const row = {
   id: 'l1', action: 'retry_privatization_refund', performed_by: 'admin-1',
@@ -112,5 +115,66 @@ describe('getAuditLogsAction', () => {
   it('offset et limit non entiers arrondis', async () => {
     await getAuditLogsAction({ limit: 10.7, offset: 20.2 });
     expect(calls).toEqual(expect.arrayContaining([['range', [20, 29]]]));
+  });
+});
+
+describe('Monitoring : libellés, filtres et détails', () => {
+  // Actions écrites par les Edge Functions de theresto_app (lot 9, commits 41092456 et b18dcc69).
+  const EDGE_ACTIONS = [
+    'create_restaurant_invitation', 'approve_restaurant', 'reject_restaurant',
+    'list_privatization_incidents', 'view_restaurant_billing', 'resolve_privatization_incident',
+  ];
+
+  it('chaque action des Edge Functions a un libellé et figure dans le filtre', () => {
+    for (const action of EDGE_ACTIONS) {
+      expect(AUDIT_ACTION_LABELS[action]).toBeTruthy();
+      expect(AUDIT_ACTION_OPTIONS.map((o) => o.value)).toContain(action);
+    }
+    expect(AUDIT_ACTION_LABELS.view_restaurant_billing).toBe('Facturation du restaurant consultée');
+  });
+
+  it('les cibles des Edge Functions ont un libellé et figurent dans le filtre', () => {
+    for (const type of ['onboarding_invitation', 'restaurant', 'privatization_incident']) {
+      expect(AUDIT_RESOURCE_LABELS[type]).toBeTruthy();
+      expect(AUDIT_RESOURCE_OPTIONS.map((o) => o.value)).toContain(type);
+    }
+  });
+
+  it('détails des Edge Functions affichés', () => {
+    expect(formatAuditDetails({ hasAccount: false })).toBe('Compte existant : non');
+    expect(formatAuditDetails({ correctionMode: 'correction_required', sectionsToFix: 2, hasReason: true }))
+      .toBe('Mode : correction_required · Sections à corriger : 2 · Motif saisi : oui');
+    expect(formatAuditDetails({ status: 'open', count: 3 })).toBe('Statut : open · Lignes : 3');
+    expect(formatAuditDetails({ hasStripeCustomer: true })).toBe('Client Stripe : oui');
+    expect(formatAuditDetails({ status: 'resolved', hasNote: true })).toBe('Statut : resolved · Note saisie : oui');
+    expect(formatAuditDetails({ amountCents: 12345 })).toMatch(/^Montant : 123,45\s€$/);
+  });
+
+  it('aucun texte libre : clés inconnues, erreurs, e-mails et chaînes non codées ignorés', () => {
+    expect(formatAuditDetails({
+      error: 'No such customer: jean@dupont.fr', lastError: 'x', resolution: 'Appelé Jean Dupont',
+      adminEmail: 'admin@theresto.fr', search: 'Dupont',
+    })).toBe('');
+    expect(formatAuditDetails({ status: 'Jean Dupont a appelé', correctionMode: 'a@b.fr' })).toBe('');
+    expect(formatAuditDetails({ fields: ['name', 'phone_number', 'jean@dupont.fr'] })).toBe('Champs : name, phone_number');
+    expect(formatAuditDetails(undefined)).toBe('');
+    expect(formatAuditDetails({ count: Number.NaN, hasNote: 'oui' })).toBe('');
+  });
+});
+
+describe('getAuditLogsAction : filtres action et type', () => {
+  beforeEach(() => { calls.length = 0; });
+
+  it('filtre par action et par type', async () => {
+    await getAuditLogsAction({ action: 'view_restaurant_billing', resourceType: 'restaurant' });
+    expect(calls).toEqual(expect.arrayContaining([
+      ['eq', ['action', 'view_restaurant_billing']],
+      ['eq', ['target_type', 'restaurant']],
+    ]));
+  });
+
+  it('filtres non textuels ignorés', async () => {
+    await getAuditLogsAction({ action: 42 as never, resourceType: {} as never });
+    expect(calls.some(([m]) => m === 'eq')).toBe(false);
   });
 });

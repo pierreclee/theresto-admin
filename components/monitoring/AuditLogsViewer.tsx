@@ -5,57 +5,13 @@ import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { useAuditLogs } from '@/lib/hooks/useAuditLogs';
 import { Table } from '@/components/shared/Table';
 import { AuditLog } from '@/lib/types/audit';
-
-// Actions écrites dans platform_logs (RGPD-29) : Server Actions de theresto-admin et Edge
-// Functions admin (admin-onboarding, commission-settings, subscription-prices,
-// admin-privatization-incidents, migration-tools, cron-invoice-commissions).
-const actionLabels: Record<string, string> = {
-  list_users: 'Liste des utilisateurs consultée',
-  view_user: 'Utilisateur consulté',
-  view_user_profile: 'Fiche utilisateur consultée',
-  moderate_user: 'Utilisateur modéré',
-  list_restaurants: 'Liste des restaurants consultée',
-  view_restaurant: 'Restaurant consulté',
-  view_kbis: 'Kbis consulté',
-  update_restaurant: 'Restaurant modifié',
-  suspend_restaurant: 'Restaurant suspendu',
-  approve_restaurant: 'Restaurant approuvé',
-  reject_restaurant: 'Restaurant refusé',
-  create_restaurant_invitation: 'Invitation envoyée',
-  subscription_plan_changed: 'Formule modifiée',
-  update_platform_config: 'Configuration modifiée',
-  update_subscription_price: 'Prix d’abonnement modifié',
-  update_global_commission_rates: 'Commissions globales modifiées',
-  update_restaurant_commission_rates: 'Commissions du restaurant modifiées',
-  reset_restaurant_commission_rates: 'Commissions du restaurant réinitialisées',
-  update_global_online_commission_rates: 'Taux en ligne globaux modifiés',
-  update_restaurant_online_commission_rate: 'Taux en ligne du restaurant modifié',
-  reset_restaurant_online_commission_rate: 'Taux en ligne du restaurant réinitialisé',
-  update_global_privatization_commission_rates: 'Taux de privatisation globaux modifiés',
-  update_restaurant_privatization_commission_rate: 'Taux de privatisation du restaurant modifié',
-  reset_restaurant_privatization_commission_rate: 'Taux de privatisation du restaurant réinitialisé',
-  list_privatization_incidents: 'Incidents de privatisation consultés',
-  retry_privatization_refund: 'Remboursement relancé',
-  retry_privatization_refund_failed: 'Remboursement relancé (échec)',
-  return_privatization_customer_balance: 'Solde client rendu',
-  return_privatization_customer_balance_failed: 'Solde client rendu (échec)',
-  resolve_privatization_incident: 'Incident traité',
-  backfill_platform_revenue: 'Revenus de la plateforme recalculés',
-  commission_invoice_failed: 'Facture de commissions en échec',
-};
-
-const resourceLabels: Record<string, string> = {
-  user: 'Utilisateur',
-  restaurant: 'Restaurant',
-  kbis: 'Kbis',
-  config: 'Configuration',
-  onboarding_invitation: 'Invitation',
-  commission_rates: 'Commissions',
-  subscription_price: 'Prix',
-  privatization_incident: 'Incident',
-  commission_invoice: 'Facture',
-  platform: 'Plateforme',
-};
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_ACTION_OPTIONS,
+  AUDIT_RESOURCE_LABELS,
+  AUDIT_RESOURCE_OPTIONS,
+  formatAuditDetails,
+} from '@/lib/utils/auditLog';
 
 function parseDate(value: unknown): Date {
   if (value && typeof value === 'object' && 'toDate' in value) {
@@ -70,6 +26,8 @@ export function AuditLogsViewer() {
   const [offset, setOffset] = useState(0);
   const [startInput, setStartInput] = useState('');
   const [endInput, setEndInput] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [resourceFilter, setResourceFilter] = useState('');
 
   const { data, isPending } = useAuditLogs({
     limit: LIMIT,
@@ -77,6 +35,8 @@ export function AuditLogsViewer() {
     // Jours « AAAA-MM-JJ » des champs date, lus comme des jours de Paris par le serveur.
     startDate: startInput || undefined,
     endDate: endInput || undefined,
+    action: actionFilter || undefined,
+    resourceType: resourceFilter || undefined,
   });
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 0;
@@ -107,9 +67,29 @@ export function AuditLogsViewer() {
             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
           />
         </div>
-        {(startInput || endInput) && (
+        <select
+          aria-label="Action"
+          value={actionFilter}
+          onChange={(e) => { setActionFilter(e.target.value); resetOffset(); }}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+        >
+          <option value="">Toutes les actions</option>
+          {AUDIT_ACTION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select
+          aria-label="Type"
+          value={resourceFilter}
+          onChange={(e) => { setResourceFilter(e.target.value); resetOffset(); }}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+        >
+          <option value="">Tous les types</option>
+          {AUDIT_RESOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {(startInput || endInput || actionFilter || resourceFilter) && (
           <button
-            onClick={() => { setStartInput(''); setEndInput(''); resetOffset(); }}
+            onClick={() => {
+              setStartInput(''); setEndInput(''); setActionFilter(''); setResourceFilter(''); resetOffset();
+            }}
             className="text-xs text-gray-400 hover:text-red-500 transition-colors"
           >
             Réinitialiser
@@ -147,12 +127,22 @@ export function AuditLogsViewer() {
           {
             key: 'action',
             label: 'Action',
-            render: (v) => actionLabels[String(v)] ?? String(v),
+            render: (v) => AUDIT_ACTION_LABELS[String(v)] ?? String(v),
           },
           {
             key: 'resourceType',
             label: 'Type',
-            render: (v) => resourceLabels[String(v)] ?? String(v),
+            render: (v) => AUDIT_RESOURCE_LABELS[String(v)] ?? String(v),
+          },
+          {
+            key: 'changes',
+            label: 'Détails',
+            // Liste blanche, sans texte libre (RGPD-29, D3).
+            render: (v) => (
+              <span className="text-xs text-gray-500">
+                {formatAuditDetails(v as Record<string, unknown> | undefined) || '—'}
+              </span>
+            ),
           },
           {
             key: 'success',

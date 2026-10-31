@@ -107,3 +107,23 @@ describe('écritures journalisées', () => {
     })]);
   });
 });
+
+describe('approbation et refus : auditLogged de l Edge Function admin-onboarding', () => {
+  const invoke = jest.fn();
+  beforeEach(async () => {
+    invoke.mockReset();
+    const server = jest.requireMock('@/lib/supabase/server') as { createClient: jest.Mock };
+    server.createClient.mockResolvedValue({ functions: { invoke } });
+  });
+
+  it('approbation : auditLogged transmis', async () => {
+    invoke.mockResolvedValue({ data: { data: { success: true, auditLogged: false } }, error: null });
+    await expect(approveRestaurantAction('r1', 'approved')).resolves.toEqual({ ok: true, auditLogged: false });
+    expect(invoke).toHaveBeenCalledWith('admin-onboarding', { body: { action: 'approveOnboardingRestaurant', restaurantId: 'r1' } });
+  });
+
+  it('refus : auditLogged transmis', async () => {
+    invoke.mockResolvedValue({ data: { data: { success: true, auditLogged: true } }, error: null });
+    await expect(approveRestaurantAction('r1', 'rejected', 'motif', 'permanent')).resolves.toEqual({ ok: true, auditLogged: true });
+  });
+});

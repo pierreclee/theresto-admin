@@ -4,6 +4,7 @@
 // e-mail (hors celui de l'admin), un téléphone ni le texte d'un motif (D3).
 // created_at est fixé par la base : ne pas l'envoyer.
 import { getAdminClient } from '@/lib/supabase/server';
+import { ADMIN_LOG_FAILED_MESSAGE } from '@/lib/audit/messages';
 
 export type AdminTargetType = 'user' | 'restaurant' | 'kbis' | 'config';
 
@@ -19,8 +20,7 @@ export interface AdminActor {
   email?: string | null;
 }
 
-export const ADMIN_LOG_FAILED_MESSAGE =
-  "Consultation impossible : le journal d'administration n'a pas pu être écrit. Réessayez.";
+export { ADMIN_LOG_FAILED_MESSAGE } from '@/lib/audit/messages';
 
 /**
  * Refus d'une consultation faute de journal (D2). Renvoyé, jamais levé : Next.js masque en

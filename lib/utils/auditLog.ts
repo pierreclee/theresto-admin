@@ -57,3 +57,125 @@ export function parisDayStart(day: string, addDays = 0): Date | null {
   const first = wall - parisOffsetMs(wall);
   return new Date(wall - parisOffsetMs(first));
 }
+
+// Actions écrites dans platform_logs (RGPD-29) : Server Actions de theresto-admin et Edge
+// Functions admin de theresto_app (admin-onboarding, admin-restaurant-billing,
+// admin-privatization-incidents, commission-settings, subscription-prices, migration-tools,
+// cron-invoice-commissions).
+export const AUDIT_ACTION_LABELS: Record<string, string> = {
+  list_users: 'Liste des utilisateurs consultée',
+  view_user: 'Utilisateur consulté',
+  view_user_profile: 'Fiche utilisateur consultée',
+  moderate_user: 'Utilisateur modéré',
+  list_restaurants: 'Liste des restaurants consultée',
+  view_restaurant: 'Restaurant consulté',
+  view_kbis: 'Kbis consulté',
+  view_restaurant_billing: 'Facturation du restaurant consultée',
+  update_restaurant: 'Restaurant modifié',
+  suspend_restaurant: 'Restaurant suspendu',
+  approve_restaurant: 'Restaurant approuvé',
+  reject_restaurant: 'Restaurant refusé',
+  create_restaurant_invitation: 'Invitation envoyée',
+  subscription_plan_changed: 'Formule modifiée',
+  update_platform_config: 'Configuration modifiée',
+  update_subscription_price: 'Prix d’abonnement modifié',
+  update_global_commission_rates: 'Commissions globales modifiées',
+  update_restaurant_commission_rates: 'Commissions du restaurant modifiées',
+  reset_restaurant_commission_rates: 'Commissions du restaurant réinitialisées',
+  update_global_online_commission_rates: 'Taux en ligne globaux modifiés',
+  update_restaurant_online_commission_rate: 'Taux en ligne du restaurant modifié',
+  reset_restaurant_online_commission_rate: 'Taux en ligne du restaurant réinitialisé',
+  update_global_privatization_commission_rates: 'Taux de privatisation globaux modifiés',
+  update_restaurant_privatization_commission_rate: 'Taux de privatisation du restaurant modifié',
+  reset_restaurant_privatization_commission_rate: 'Taux de privatisation du restaurant réinitialisé',
+  list_privatization_incidents: 'Incidents de privatisation consultés',
+  retry_privatization_refund: 'Remboursement relancé',
+  retry_privatization_refund_failed: 'Remboursement relancé (échec)',
+  return_privatization_customer_balance: 'Solde client rendu',
+  return_privatization_customer_balance_failed: 'Solde client rendu (échec)',
+  resolve_privatization_incident: 'Incident traité',
+  backfill_platform_revenue: 'Revenus de la plateforme recalculés',
+  commission_invoice_failed: 'Facture de commissions en échec',
+};
+
+export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
+  user: 'Utilisateur',
+  restaurant: 'Restaurant',
+  kbis: 'Kbis',
+  config: 'Configuration',
+  onboarding_invitation: 'Invitation',
+  commission_rates: 'Commissions',
+  subscription_price: 'Prix',
+  privatization_incident: 'Incident',
+  commission_invoice: 'Facture',
+  platform: 'Plateforme',
+};
+
+function toOptions(labels: Record<string, string>): { value: string; label: string }[] {
+  return Object.entries(labels)
+    .map(([value, label]) => ({ value, label }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'fr'));
+}
+
+/** Choix des filtres « Action » et « Type » du Monitoring. */
+export const AUDIT_ACTION_OPTIONS = toOptions(AUDIT_ACTION_LABELS);
+export const AUDIT_RESOURCE_OPTIONS = toOptions(AUDIT_RESOURCE_LABELS);
+
+// Détails affichés : liste blanche de clés, par type. Jamais de texte libre (D3) : une chaîne
+// n'est montrée que pour une clé de code (statut, plan…) et si elle a la forme d'un code ;
+// erreurs, e-mails, motifs, identifiants Stripe et clés inconnues ne sont jamais affichés.
+const CODE = /^[A-Za-z0-9_-]{1,40}$/;
+const BOOLEAN_KEYS: Record<string, string> = {
+  hasAccount: 'Compte existant',
+  hasStripeCustomer: 'Client Stripe',
+  hasReason: 'Motif saisi',
+  hasNote: 'Note saisie',
+  search: 'Recherche',
+  maintenanceMode: 'Maintenance',
+};
+const NUMBER_KEYS: Record<string, string> = {
+  count: 'Lignes',
+  sectionsToFix: 'Sections à corriger',
+  attempts: 'Tentatives',
+};
+const EURO_KEYS: Record<string, string> = {
+  previousAmount: 'Ancien montant',
+  newAmount: 'Nouveau montant',
+};
+const CODE_KEYS: Record<string, string> = {
+  status: 'Statut',
+  newStatus: 'Nouveau statut',
+  correctionMode: 'Mode',
+  oldPlan: 'Ancien plan',
+  newPlan: 'Nouveau plan',
+  roleFilter: 'Rôle',
+  statusFilter: 'Filtre de statut',
+  subscription: 'Abonnement',
+  refundStatus: 'Statut du remboursement',
+  currency: 'Devise',
+  period: 'Période',
+};
+const EURO = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
+
+function formatDetail(key: string, value: unknown): string | null {
+  if (key in BOOLEAN_KEYS) return typeof value === 'boolean' ? `${BOOLEAN_KEYS[key]} : ${value ? 'oui' : 'non'}` : null;
+  const isNumber = typeof value === 'number' && Number.isFinite(value);
+  if (key in NUMBER_KEYS) return isNumber ? `${NUMBER_KEYS[key]} : ${value}` : null;
+  if (key === 'amountCents') return isNumber ? `Montant : ${EURO.format((value as number) / 100)}` : null;
+  if (key in EURO_KEYS) return isNumber ? `${EURO_KEYS[key]} : ${EURO.format(value as number)}` : null;
+  if (key in CODE_KEYS) return typeof value === 'string' && CODE.test(value) ? `${CODE_KEYS[key]} : ${value}` : null;
+  if (key === 'fields' && Array.isArray(value)) {
+    const fields = value.filter((f): f is string => typeof f === 'string' && CODE.test(f));
+    return fields.length ? `Champs : ${fields.join(', ')}` : null;
+  }
+  return null;
+}
+
+/** Détails d'une ligne du journal, lisibles et sans texte libre ; '' si rien à montrer. */
+export function formatAuditDetails(details: Record<string, unknown> | null | undefined): string {
+  if (!details || typeof details !== 'object') return '';
+  return Object.entries(details)
+    .map(([key, value]) => formatDetail(key, value))
+    .filter((part): part is string => part !== null)
+    .join(' · ');
+}

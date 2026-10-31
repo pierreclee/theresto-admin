@@ -1,5 +1,6 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
+import { ADMIN_LOG_FAILED_MESSAGE, EDGE_AUDIT_LOG_UNAVAILABLE } from '@/lib/audit/messages';
 
 // Appel d'une Edge Function avec la session de l'admin (côté serveur).
 // Errors are returned, not thrown: production hides thrown messages.
@@ -19,6 +20,11 @@ export async function invokeEdgeFunction<T>(
       const payload = await error.context.json().catch(() => null);
       message = payload?.error?.message ?? message;
       code = payload?.error?.code;
+    }
+    // Consultation refusée par l'Edge Function faute de journal (RGPD-29, D2) : même refus
+    // que les lectures de l'admin, affiché par les écrans.
+    if (message === EDGE_AUDIT_LOG_UNAVAILABLE) {
+      return { ok: false, code: 'audit-log-failed', error: ADMIN_LOG_FAILED_MESSAGE };
     }
     return { ok: false, code, error: message };
   }

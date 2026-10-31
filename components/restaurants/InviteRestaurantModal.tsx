@@ -6,6 +6,7 @@ import {
   inviteRestaurantOwnerAction,
   type InviteRestaurantOwnerResult,
 } from '@/lib/actions/invitations';
+import { useToast } from '@/components/shared/Toaster';
 
 type Invitation = Extract<InviteRestaurantOwnerResult, { ok: true }>;
 
@@ -21,6 +22,7 @@ export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
   const [isPending, setIsPending] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [copied, setCopied] = useState(false);
+  const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +32,9 @@ export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
       const result = await inviteRestaurantOwnerAction(email.trim());
       if (result.ok) {
         setInvitation(result);
+        if (result.auditLogged === false) {
+          toast("Invitation envoyée, mais elle n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+        }
       } else {
         setError(result.error);
       }

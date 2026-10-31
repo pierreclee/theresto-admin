@@ -19,8 +19,8 @@ const EXEMPT: Record<string, string> = {
   // billing.ts
   getRevenueSummaryAction: 'agrégats de revenus du restaurant (RPC admin_restaurant_revenue_summary), non personnels',
   getStripeOverviewAction:
-    "Edge Function admin-restaurant-billing, lecture seule, qui ne journalise PAS : état Stripe du restaurant, "
-    + 'hors des consultations retenues par D1 (montre toutefois l e-mail du client Stripe : à réexaminer)',
+    'journalisée par l Edge Function admin-restaurant-billing (view_restaurant_billing), '
+    + 'consultation refusée si le journal échoue (D2)',
   backfillPlatformRevenueAction: 'journalisée par l Edge Function migration-tools (platform_logs)',
   // commissionSettings.ts
   getCommissionSettingsAction: 'tarifs et totaux mensuels, non personnels',
@@ -34,10 +34,11 @@ const EXEMPT: Record<string, string> = {
   setRestaurantPrivatizationRateAction: 'journalisée par l Edge Function commission-settings',
   // invitations.ts
   inviteRestaurantOwnerAction:
-    'Edge Function admin-onboarding : journal prévu par la tâche 8 du plan du lot 9 (pas encore livré)',
+    'journalisée par l Edge Function admin-onboarding (create_restaurant_invitation), auditLogged renvoyé',
   // privatizationIncidents.ts
   listPrivatizationIncidentsAction:
-    'Edge Function admin-privatization-incidents : journal de la liste prévu par la tâche 8 du plan du lot 9 (pas encore livré)',
+    'journalisée par l Edge Function admin-privatization-incidents (list_privatization_incidents), '
+    + 'consultation refusée si le journal échoue (D2)',
   retryPrivatizationRefundAction: 'journalisée par l Edge Function admin-privatization-incidents',
   returnPrivatizationCustomerBalanceAction: 'journalisée par l Edge Function admin-privatization-incidents',
   resolvePrivatizationIncidentAction: 'journalisée par l Edge Function admin-privatization-incidents',
