@@ -3,7 +3,7 @@ export interface AuditLog {
   adminId: string;
   adminEmail?: string;
   action: string;
-  resourceType: 'restaurant' | 'user' | 'config';
+  resourceType: string;
   resourceId?: string;
   changes?: Record<string, any>;
   timestamp: Date;

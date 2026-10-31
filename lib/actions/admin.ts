@@ -12,6 +12,7 @@ import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/serve
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import { hasRecentTotp, RECENT_MFA_REQUIRED_MESSAGE } from '@/lib/utils/recentMfa';
 import { normalizeSubscriptionPlan, type SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
+import { dayAfter, PLATFORM_LOG_COLUMNS, toAuditLog, type PlatformLogRow } from '@/lib/utils/auditLog';
 
 export async function getStatsAction(): Promise<PlatformStats> {
   await requireAdmin();
@@ -216,20 +217,21 @@ export async function updateSubscriptionPlanAction(
 export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
-  
-  let query = adminDb.from('audit_logs').select('*', { count: 'exact' });
-  
+  const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+  const offset = Math.max(filters.offset ?? 0, 0);
+
+  // Journal d'administration (RGPD-29) : platform_logs, seule table écrite (audit_logs supprimée au lot 9).
+  let query = adminDb.from('platform_logs').select(PLATFORM_LOG_COLUMNS, { count: 'exact' });
   if (filters.action) query = query.eq('action', filters.action);
-  if (filters.resourceType) query = query.eq('resource_type', filters.resourceType);
-  if (filters.adminId) query = query.eq('admin_id', filters.adminId);
-  if (filters.limit) query = query.limit(filters.limit);
-  
-  query = query.order('created_at', { ascending: false });
-  
+  if (filters.resourceType) query = query.eq('target_type', filters.resourceType);
+  if (filters.adminId) query = query.eq('performed_by', filters.adminId);
+  if (filters.startDate) query = query.gte('created_at', new Date(filters.startDate).toISOString());
+  if (filters.endDate) query = query.lt('created_at', dayAfter(new Date(filters.endDate)).toISOString());
+  query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
+
   const { data, count, error } = await query;
   if (error) throw new Error(error.message);
-  
-  return { logs: (data as any) || [], total: count || 0 };
+  return { logs: ((data ?? []) as PlatformLogRow[]).map(toAuditLog), total: count ?? 0 };
 }
 
 export async function getConfigAction(): Promise<PlatformConfig> {
