@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { useAuditLogs } from '@/lib/hooks/useAuditLogs';
 import { Table } from '@/components/shared/Table';
 import { AuditLog } from '@/lib/types/audit';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 import {
   AUDIT_ACTION_LABELS,
   AUDIT_ACTION_OPTIONS,
@@ -29,7 +30,7 @@ export function AuditLogsViewer() {
   const [actionFilter, setActionFilter] = useState('');
   const [resourceFilter, setResourceFilter] = useState('');
 
-  const { data, isPending } = useAuditLogs({
+  const { data, isPending, error } = useAuditLogs({
     limit: LIMIT,
     offset,
     // Jours « AAAA-MM-JJ » des champs date, lus comme des jours de Paris par le serveur.
@@ -101,6 +102,12 @@ export function AuditLogsViewer() {
           </span>
         )}
       </div>
+
+      {error && (
+        <div role="alert" className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
+          {actionErrorMessage(error, 'Erreur de chargement du journal')}
+        </div>
+      )}
 
       {/* Table */}
       <Table<AuditLog>

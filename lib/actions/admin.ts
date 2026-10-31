@@ -244,7 +244,10 @@ export async function updateSubscriptionPlanAction(
   return { success: true, auditLogged };
 }
 
-export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> {
+// Résultat plutôt qu'exception : Next.js masque en production le message d'une exception.
+export async function getAuditLogsAction(
+  filters: AuditLogFilter,
+): Promise<{ ok: true; data: { logs: AuditLog[]; total: number } } | { ok: false; error: string }> {
   await requireAdmin();
   const adminDb = await getAdminClient();
   // Valeurs venues du navigateur : non numériques → valeurs par défaut.
@@ -266,8 +269,8 @@ export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ log
   query = query.order('created_at', { ascending: false }).range(offset, offset + limit - 1);
 
   const { data, count, error } = await query;
-  if (error) throw new Error(error.message);
-  return { logs: ((data ?? []) as PlatformLogRow[]).map(toAuditLog), total: count ?? 0 };
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, data: { logs: ((data ?? []) as PlatformLogRow[]).map(toAuditLog), total: count ?? 0 } };
 }
 
 export async function getConfigAction(): Promise<PlatformConfig> {

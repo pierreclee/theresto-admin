@@ -11,7 +11,8 @@ export const adminApi = {
   getKbisUrl: actions.getKbisUrlAction,
   approveRestaurant: actions.approveRestaurantAction,
   updateSubscriptionPlan: actions.updateSubscriptionPlanAction,
-  getAuditLogs: actions.getAuditLogsAction,
+  getAuditLogs: (filters: Parameters<typeof actions.getAuditLogsAction>[0]) =>
+    unwrapAction(actions.getAuditLogsAction(filters)),
   getConfig: actions.getConfigAction,
   updateConfig: actions.updateConfigAction,
 };

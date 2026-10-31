@@ -22,8 +22,10 @@ export async function invokeEdgeFunction<T>(
       code = payload?.error?.code;
     }
     // Consultation refusée par l'Edge Function faute de journal (RGPD-29, D2) : même refus
-    // que les lectures de l'admin, affiché par les écrans.
-    if (message === EDGE_AUDIT_LOG_UNAVAILABLE) {
+    // que les lectures de l'admin, affiché par les écrans. Code stable (503) en priorité ;
+    // la comparaison du message reconnaît les fonctions déployées avant la PR #60 (500
+    // « internal ») et pourra être retirée une fois la PR #60 déployée.
+    if (code === 'audit-log-failed' || message === EDGE_AUDIT_LOG_UNAVAILABLE) {
       return { ok: false, code: 'audit-log-failed', error: ADMIN_LOG_FAILED_MESSAGE };
     }
     return { ok: false, code, error: message };

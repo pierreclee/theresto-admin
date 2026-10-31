@@ -103,7 +103,12 @@ describe('getAuditLogsAction', () => {
     result.count = 1;
     const out = await getAuditLogsAction({ limit: 10_000, offset: -5 });
     expect(calls).toEqual(expect.arrayContaining([['range', [0, 199]]]));
-    expect(out).toEqual({ logs: [toAuditLog(row)], total: 1 });
+    expect(out).toEqual({ ok: true, data: { logs: [toAuditLog(row)], total: 1 } });
+  });
+
+  it('erreur de lecture : résultat { ok: false, error } au lieu d une exception (masquée en production)', async () => {
+    result.error = { message: 'relation indisponible' };
+    await expect(getAuditLogsAction({})).resolves.toEqual({ ok: false, error: 'relation indisponible' });
   });
 
   it('page et dates non numériques ou invalides : valeurs par défaut, aucun filtre', async () => {
