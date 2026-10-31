@@ -117,10 +117,13 @@ describe('Server Actions : requireAdmin() avant la clé service', () => {
     expect(outside).toEqual([]);
   });
 
-  it("getAdminClient n'est utilisé que dans lib/actions/ et lib/supabase/", () => {
+  it("getAdminClient n'est utilisé que dans lib/actions/, lib/supabase/ et le journal d'administration", () => {
     const allowed = [ACTIONS_DIR, path.join(ROOT, 'lib/supabase')].map((d) => d + path.sep);
+    // Journal d'administration (RGPD-29) : pas un fichier 'use server' (test ci-dessus), il
+    // n'est appelé que par une Server Action, après requireAdmin(), avec l'admin vérifié.
+    const allowedFiles = [path.join(ROOT, 'lib/audit/adminLog.ts')];
     const offenders = SCANNED_DIRS.flatMap(listSourceFiles)
-      .filter((f) => !allowed.some((d) => f.startsWith(d)))
+      .filter((f) => !allowed.some((d) => f.startsWith(d)) && !allowedFiles.includes(f))
       .filter((f) => /\bgetAdminClient\b/.test(fs.readFileSync(f, 'utf8')))
       .map(rel);
     expect(offenders).toEqual([]);
