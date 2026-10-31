@@ -32,6 +32,7 @@ import { planRateLabel } from './PlanRateModal';
 import { useRestaurantCommission } from '@/lib/hooks/useCommissionSettings';
 import { formatPercent } from '@/lib/utils/commissionRates';
 import { CommissionSection } from './CommissionSection';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 import { BillingSection } from './BillingSection';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
@@ -188,7 +189,7 @@ interface Props {
 }
 
 function OwnerRow({ ownerId }: { ownerId: string }) {
-  const { data: owner, isPending } = useQuery({
+  const { data: owner, isPending, error } = useQuery({
     queryKey: ['user', ownerId],
     queryFn: () => usersApi.getUser(ownerId),
   });
@@ -201,6 +202,8 @@ function OwnerRow({ ownerId }: { ownerId: string }) {
         <p className="text-xs text-gray-400 mb-0.5">Propriétaire</p>
         {isPending ? (
           <p className="text-sm text-gray-400">Chargement…</p>
+        ) : error ? (
+          <p className="text-sm text-red-600">{actionErrorMessage(error, 'Indisponible')}</p>
         ) : owner ? (
           <NextLink href={`/users?user=${ownerId}`} className="text-sm font-medium text-[#FF6B35] hover:underline">
             {owner.name || owner.email}

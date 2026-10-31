@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { usersApi } from '@/lib/api/users';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 import { Search, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { useUsers } from '@/lib/hooks/useUsers';
 import { ModerationBadge } from '@/components/users/ModerationBadge';
@@ -94,14 +95,16 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
 
   // /users?user=<id> (e.g. restaurant owner link): open that user's detail
   useEffect(() => {
     const userId = new URLSearchParams(window.location.search).get('user');
     if (!userId) return;
-    usersApi.getUser(userId).then((user) => {
-      if (user) setSelectedUser(user);
-    });
+    usersApi.getUser(userId).then(
+      (user) => { if (user) setSelectedUser(user); },
+      (e: unknown) => setLinkError(actionErrorMessage(e, "Impossible d'ouvrir la fiche de cet utilisateur")),
+    );
   }, []);
 
   const { users, isPending, error, hasMore, loadMore } = useUsers({
@@ -160,9 +163,15 @@ export default function UsersPage() {
           </div>
         </div>
 
+        {linkError && (
+          <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
+            {linkError}
+          </div>
+        )}
+
         {error && (
           <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
-            Erreur de chargement des utilisateurs
+            {actionErrorMessage(error, 'Erreur de chargement des utilisateurs')}
           </div>
         )}
 

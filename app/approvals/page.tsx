@@ -3,6 +3,7 @@
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 import { RestaurantTable } from '@/components/restaurants/RestaurantTable';
 import { RestaurantDetail } from '@/components/restaurants/RestaurantDetail';
 import { Search, ChevronLeft, Clock, AlertCircle } from 'lucide-react';
@@ -126,7 +127,7 @@ function ApprovalsContent() {
 
         {error && (
           <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
-            Erreur de chargement des restaurants
+            {actionErrorMessage(error, 'Erreur de chargement des restaurants')}
           </div>
         )}
 

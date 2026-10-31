@@ -6,13 +6,21 @@ import { ChevronLeft } from 'lucide-react';
 import { useRestaurantDetail } from '@/lib/hooks/useRestaurants';
 import { RestaurantDetail } from '@/components/restaurants/RestaurantDetail';
 import { Loading } from '@/components/shared/Loading';
+import { actionErrorMessage } from '@/lib/api/actionResult';
 
 export default function RestaurantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { data: restaurant, isPending } = useRestaurantDetail(id);
+  const { data: restaurant, isPending, error } = useRestaurantDetail(id);
 
   if (isPending) return <Loading />;
+  if (error) {
+    return (
+      <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
+        {actionErrorMessage(error, 'Impossible de charger ce restaurant')}
+      </div>
+    );
+  }
   if (!restaurant) return <div className="p-6 text-gray-600">Restaurant non trouvé</div>;
 
   return (

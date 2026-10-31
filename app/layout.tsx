@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { connection } from 'next/server';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
@@ -19,11 +20,13 @@ export const metadata: Metadata = {
 
 import RootLayoutClient from './layout-client';
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Rendu à chaque requête : le nonce de la CSP (middleware.ts) s'applique (RGPD lot 7).
+  await connection();
   return (
     <html
       lang="fr"

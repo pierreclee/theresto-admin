@@ -5,28 +5,14 @@ import { ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { useAuditLogs } from '@/lib/hooks/useAuditLogs';
 import { Table } from '@/components/shared/Table';
 import { AuditLog } from '@/lib/types/audit';
-
-const actionLabels: Record<string, string> = {
-  restaurant_approved:    'Restaurant approuvé',
-  restaurant_rejected:    'Restaurant refusé',
-  restaurant_suspended:   'Restaurant suspendu',
-  restaurant_approval:    'Statut restaurant modifié',
-  restaurant_updated:     'Restaurant modifié',
-  subscription_change:    'Abonnement modifié',
-  commission_updated:     'Commission modifiée',
-  user_moderation:        'Utilisateur modéré',
-  crm_user_update:        'Profil utilisateur modifié',
-  crm_profile_view:       'Profil consulté',
-  config_updated:         'Configuration modifiée',
-  restaurant_impersonate: 'Impersonation restaurant',
-};
-
-const resourceLabels: Record<string, string> = {
-  restaurant: 'Restaurant',
-  user:       'Utilisateur',
-  config:     'Configuration',
-  platform_coupon: 'Coupon',
-};
+import { actionErrorMessage } from '@/lib/api/actionResult';
+import {
+  AUDIT_ACTION_LABELS,
+  AUDIT_ACTION_OPTIONS,
+  AUDIT_RESOURCE_LABELS,
+  AUDIT_RESOURCE_OPTIONS,
+  formatAuditDetails,
+} from '@/lib/utils/auditLog';
 
 function parseDate(value: unknown): Date {
   if (value && typeof value === 'object' && 'toDate' in value) {
@@ -41,12 +27,17 @@ export function AuditLogsViewer() {
   const [offset, setOffset] = useState(0);
   const [startInput, setStartInput] = useState('');
   const [endInput, setEndInput] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
+  const [resourceFilter, setResourceFilter] = useState('');
 
-  const { data, isPending } = useAuditLogs({
+  const { data, isPending, error } = useAuditLogs({
     limit: LIMIT,
     offset,
-    startDate: startInput ? new Date(startInput) : undefined,
-    endDate: endInput ? new Date(endInput) : undefined,
+    // Jours « AAAA-MM-JJ » des champs date, lus comme des jours de Paris par le serveur.
+    startDate: startInput || undefined,
+    endDate: endInput || undefined,
+    action: actionFilter || undefined,
+    resourceType: resourceFilter || undefined,
   });
 
   const totalPages = data ? Math.ceil(data.total / LIMIT) : 0;
@@ -77,9 +68,29 @@ export function AuditLogsViewer() {
             className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
           />
         </div>
-        {(startInput || endInput) && (
+        <select
+          aria-label="Action"
+          value={actionFilter}
+          onChange={(e) => { setActionFilter(e.target.value); resetOffset(); }}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+        >
+          <option value="">Toutes les actions</option>
+          {AUDIT_ACTION_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <select
+          aria-label="Type"
+          value={resourceFilter}
+          onChange={(e) => { setResourceFilter(e.target.value); resetOffset(); }}
+          className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+        >
+          <option value="">Tous les types</option>
+          {AUDIT_RESOURCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        {(startInput || endInput || actionFilter || resourceFilter) && (
           <button
-            onClick={() => { setStartInput(''); setEndInput(''); resetOffset(); }}
+            onClick={() => {
+              setStartInput(''); setEndInput(''); setActionFilter(''); setResourceFilter(''); resetOffset();
+            }}
             className="text-xs text-gray-400 hover:text-red-500 transition-colors"
           >
             Réinitialiser
@@ -91,6 +102,12 @@ export function AuditLogsViewer() {
           </span>
         )}
       </div>
+
+      {error && (
+        <div role="alert" className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-lg text-sm">
+          {actionErrorMessage(error, 'Erreur de chargement du journal')}
+        </div>
+      )}
 
       {/* Table */}
       <Table<AuditLog>
@@ -117,12 +134,22 @@ export function AuditLogsViewer() {
           {
             key: 'action',
             label: 'Action',
-            render: (v) => actionLabels[String(v)] ?? String(v),
+            render: (v) => AUDIT_ACTION_LABELS[String(v)] ?? String(v),
           },
           {
             key: 'resourceType',
             label: 'Type',
-            render: (v) => resourceLabels[String(v)] ?? String(v),
+            render: (v) => AUDIT_RESOURCE_LABELS[String(v)] ?? String(v),
+          },
+          {
+            key: 'changes',
+            label: 'Détails',
+            // Liste blanche, sans texte libre (RGPD-29, D3).
+            render: (v) => (
+              <span className="text-xs text-gray-500">
+                {formatAuditDetails(v as Record<string, unknown> | undefined) || '—'}
+              </span>
+            ),
           },
           {
             key: 'success',
