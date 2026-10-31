@@ -131,7 +131,7 @@ export async function getKbisUrlAction(
 }
 
 export async function updateRestaurantAction(restaurantId: string, updates: UpdateRestaurantInput): Promise<Restaurant> {
-  await requireAdmin();
+  const admin = await requireAdmin();
   // Liste blanche d'exécution : la commission passe uniquement par l'Edge Function commission-settings (TOTP).
   const { allowed, ignored } = pickAllowedRestaurantUpdates(updates);
   if (ignored.length > 0) {
@@ -143,6 +143,11 @@ export async function updateRestaurantAction(restaurantId: string, updates: Upda
   const adminDb = await getAdminClient();
   const { data, error } = await adminDb.from('restaurants').update(allowed).eq('id', restaurantId).select().single();
   if (error) throw new Error(error.message);
+  // Noms des champs seulement : nom, e-mail, téléphone et adresse sont des données personnelles.
+  await logAdminAction(admin, {
+    action: 'update_restaurant', targetType: 'restaurant', targetId: restaurantId,
+    details: { fields: Object.keys(allowed) },
+  });
   return data as any;
 }
 
@@ -156,15 +161,18 @@ export async function approveRestaurantAction(
   reason?: string,
   correctionMode?: 'correction_required' | 'permanent'
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  await requireAdmin();
+  const admin = await requireAdmin();
 
   if (status === 'suspended') {
     const adminDb = await getAdminClient();
     const { error } = await adminDb.from('restaurants')
       .update({ approval_status: 'suspended', updated_at: new Date().toISOString() })
       .eq('id', restaurantId);
-    return error ? { ok: false, error: error.message } : { ok: true };
+    if (error) return { ok: false, error: error.message };
+    await logAdminAction(admin, { action: 'suspend_restaurant', targetType: 'restaurant', targetId: restaurantId });
+    return { ok: true };
   }
+  // Approbation et refus : journalisés par l'Edge Function admin-onboarding.
 
   const supabase = await createClient();
   const { error } = await supabase.functions.invoke('admin-onboarding', {
@@ -217,16 +225,11 @@ export async function updateSubscriptionPlanAction(
   const { error } = await adminDb.from('restaurants').update({ subscription_plan: plan }).eq('id', restaurantId);
   if (error) throw new Error(error.message);
 
-  const { error: logError } = await adminDb.from('platform_logs').insert({
-    action: 'subscription_plan_changed',
-    target_type: 'restaurant',
-    target_id: restaurantId,
-    performed_by: user.id,
-    performed_by_email: user.email ?? null,
+  const auditLogged = await logAdminAction(user, {
+    action: 'subscription_plan_changed', targetType: 'restaurant', targetId: restaurantId,
     details: { oldPlan: current?.subscription_plan ?? null, newPlan: plan },
   });
-  if (logError) console.error('[updateSubscriptionPlanAction] audit log error:', logError);
-  return { success: true, auditLogged: !logError };
+  return { success: true, auditLogged };
 }
 
 export async function getAuditLogsAction(filters: AuditLogFilter): Promise<{ logs: AuditLog[]; total: number }> {
@@ -283,6 +286,11 @@ export async function updateConfigAction(updates: UpdatePlatformConfigInput): Pr
   
   const { data, error } = await adminDb.from('app_config').upsert({ id: 'global', ...payload }).select().single();
   if (error) throw new Error(error.message);
+  // Liste blanche pickAllowedConfigUpdates (devise, mode maintenance) : valeurs non personnelles.
+  await logAdminAction(user, {
+    action: 'update_platform_config', targetType: 'config', targetId: 'global',
+    details: { ...allowed },
+  });
   
   return {
     currency: data?.currency ?? 'EUR',

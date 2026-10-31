@@ -67,10 +67,14 @@ export function useModerateUser() {
       action: ModerationAction;
       reason?: string;
     }) => usersApi.moderateUser(userId, action, reason),
-    onSuccess: (_, vars) => {
+    onSuccess: ({ auditLogged }, vars) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: ['userCrm', vars.userId] });
-      toast('Compte utilisateur mis à jour');
+      if (!auditLogged) {
+        toast("Compte mis à jour, mais la modération n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast('Compte utilisateur mis à jour');
+      }
     },
     onError: () => toast('Erreur lors de la modération', 'error'),
   });

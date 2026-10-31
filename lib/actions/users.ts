@@ -7,7 +7,7 @@ import type { AppUser, UserCrmProfile, ModerationAction } from '@/lib/types/user
 const PAGE_SIZE = 50;
 
 import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
-import { logAdminReadOrThrow } from '@/lib/audit/adminLog';
+import { logAdminAction, logAdminReadOrThrow } from '@/lib/audit/adminLog';
 
 export async function listUsersAction(opts: {
   roleFilter?: string;
@@ -116,8 +116,8 @@ export async function moderateUserAction(
   userId: string,
   action: ModerationAction,
   reason?: string
-): Promise<{ newStatus: string }> {
-  await requireAdmin();
+): Promise<{ newStatus: string; auditLogged: boolean }> {
+  const admin = await requireAdmin();
   const adminDb = await getAdminClient();
   
   let newStatus = 'active';
@@ -125,14 +125,20 @@ export async function moderateUserAction(
   if (action === 'ban') newStatus = 'banned';
   if (action === 'activate') newStatus = 'active';
   
-  const payload: any = {
+  const payload: Record<string, unknown> = {
     moderation_status: newStatus,
     moderated_at: new Date().toISOString(),
+    moderated_by: admin.id,
   };
   if (reason) payload.moderation_reason = reason;
   
   const { error } = await adminDb.from('users').update(payload).eq('id', userId);
   if (error) throw new Error(error.message);
-  
-  return { newStatus };
+
+  // Écriture journalisée (RGPD-29) : jamais le texte du motif, qui peut nommer un tiers.
+  const auditLogged = await logAdminAction(admin, {
+    action: 'moderate_user', targetType: 'user', targetId: userId,
+    details: { newStatus, hasReason: !!reason },
+  });
+  return { newStatus, auditLogged };
 }
