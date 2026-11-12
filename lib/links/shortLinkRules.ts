@@ -24,33 +24,58 @@ export type TargetScope = 'any' | 'app_store' | 'play';
 const MAX_TARGET_LENGTH = 2000;
 const MAX_LABEL_LENGTH = 200;
 
-// Mêmes motifs que public.short_link_target_allowed (hôte exact, https, ni port ni userinfo).
-const THERESTO_TARGET = /^https:\/\/((app|hub|widget)\.)?theresto\.fr([/?#].*)?$/;
-const APP_STORE_TARGET = /^https:\/\/apps\.apple\.com\//;
-const PLAY_TARGET = /^https:\/\/play\.google\.com\/store\/apps\/details\?id=com\.theresto[a-z0-9_.]*([&#].*)?$/;
-// [[:space:][:cntrl:]\\] de PostgreSQL : espaces (Unicode compris), contrôles, barre oblique inverse.
-const FORBIDDEN_CHARS = /[\s\u0000-\u001f\u007f-\u009f\\]/u;
+/**
+ * Motifs de public.short_link_target_allowed (migration 20261127110000_short_links.sql),
+ * recopiés à l'identique : chaque chaîne figure telle quelle dans la fonction SQL, et
+ * new RegExp(chaîne) a le même sens en JavaScript (test shortLinkTargetsSql.test.ts).
+ * Toute modification se fait d'abord dans la migration.
+ */
+export const TARGET_PATTERNS = {
+  /** Chemin avec « // » ou un segment « . » / « .. » (avant la chaîne de requête) : refusé. */
+  badPath: String.raw`^https://[^/?#]*[^?#]*(//|/\.\.?([/?#]|$))`,
+  appStore: String.raw`^https://apps\.apple\.com/([a-z]{2}/)?app/([a-z0-9-]+/)?id[0-9]{1,12}([?#].*)?$`,
+  play: String.raw`^https://play\.google\.com/store/apps/details\?id=com\.theresto(\.[a-z0-9_]+)*([&#].*)?$`,
+  theresto: String.raw`^https://((app|hub|widget)\.)?theresto\.fr([/?#].*)?$`,
+  /** Comparé sans tenir compte de la casse (!~* en SQL) : boucle via Pages, chemin encodé. */
+  appExcluded: String.raw`^https://app\.theresto\.fr/(telecharger|[^?#]*%)`,
+} as const;
+
+const BAD_PATH = new RegExp(TARGET_PATTERNS.badPath);
+const APP_STORE_TARGET = new RegExp(TARGET_PATTERNS.appStore);
+const PLAY_TARGET = new RegExp(TARGET_PATTERNS.play);
+const THERESTO_TARGET = new RegExp(TARGET_PATTERNS.theresto);
+const APP_EXCLUDED = new RegExp(TARGET_PATTERNS.appExcluded, 'i');
+// [[:space:][:cntrl:]\] et chr(65279) de la base : espaces, caractères de contrôle (C0, DEL,
+// C1), barre oblique inverse, BOM. \s couvre aussi les espaces Unicode : jamais plus permissif.
+const FORBIDDEN_CHARS = /[\s\u0000-\u001f\u007f-\u009f\\\uFEFF]/u;
 
 /** Cible autorisée, comme short_link_target_allowed(url, scope) en base. */
 export function isTargetAllowed(url: string, scope: TargetScope): boolean {
-  // Les motifs de la base utilisent « . » qui couvre tout caractère : la longueur se compte en
-  // points de code, comme char_length.
-  if ([...url].length > MAX_TARGET_LENGTH || FORBIDDEN_CHARS.test(url)) return false;
+  // Longueur en points de code, comme char_length.
+  if (typeof url !== 'string' || [...url].length > MAX_TARGET_LENGTH || FORBIDDEN_CHARS.test(url)) return false;
+  if (BAD_PATH.test(url)) return false;
   switch (scope) {
     case 'app_store':
       return APP_STORE_TARGET.test(url);
     case 'play':
       return PLAY_TARGET.test(url);
     case 'any':
-      return THERESTO_TARGET.test(url) || APP_STORE_TARGET.test(url) || PLAY_TARGET.test(url);
+      return (THERESTO_TARGET.test(url) && !APP_EXCLUDED.test(url))
+        || APP_STORE_TARGET.test(url) || PLAY_TARGET.test(url);
     default:
       return false;
   }
 }
 
 export const TARGET_RULE_MESSAGE =
-  'Cible non autorisée : https vers theresto.fr (app., hub., widget.), apps.apple.com ou '
-  + 'play.google.com/store/apps/details?id=com.theresto…, sans port, identifiant ni espace.';
+  'Cible non autorisée : https vers theresto.fr, hub. ou widget. (tout chemin), app.theresto.fr '
+  + '(sauf /telecharger… et un chemin encodé avec %), une fiche App Store (apps.apple.com/[pays/]app/[nom/]id123) '
+  + 'ou la fiche Google Play com.theresto… ; sans port, identifiant, espace, « // » ni « .. » dans le chemin.';
+
+export const APP_STORE_RULE_MESSAGE =
+  'App Store : fiche d\'une app seulement, https://apps.apple.com/[pays/]app/[nom/]id123456789.';
+export const PLAY_RULE_MESSAGE =
+  'Google Play : https://play.google.com/store/apps/details?id=com.theresto (ou com.theresto.<…>) exactement.';
 
 /** Saisie d'un lien (création ou modification complète), telle qu'envoyée par l'écran. */
 export interface ShortLinkInput {
@@ -207,13 +232,10 @@ export function validateShortLinkSettingsInput(raw: unknown): Validation<ShortLi
     return { ok: false, error: 'Saisie illisible.' };
   }
   if (appStore !== null && !isTargetAllowed(appStore, 'app_store')) {
-    return { ok: false, error: 'App Store : le lien doit commencer par https://apps.apple.com/.' };
+    return { ok: false, error: APP_STORE_RULE_MESSAGE };
   }
   if (play !== null && !isTargetAllowed(play, 'play')) {
-    return {
-      ok: false,
-      error: 'Google Play : le lien doit être https://play.google.com/store/apps/details?id=com.theresto…',
-    };
+    return { ok: false, error: PLAY_RULE_MESSAGE };
   }
   if (token !== null && !PROVIDER_TOKEN_PATTERN.test(token)) {
     return { ok: false, error: 'Provider token App Store : chiffres seulement, 20 au plus.' };
@@ -253,7 +275,8 @@ export function shortLinkDbErrorMessage(error: { code?: string; message?: string
     case '23505':
       return 'Ce slug est déjà pris : choisissez-en un autre.';
     case '23514':
-      return 'Format refusé par la base : vérifiez le slug (réservé ?), la source, la ville, la campagne et le libellé.';
+      return 'Format refusé par la base : vérifiez le slug (réservé ?), la source, la ville, la campagne et le libellé.'
+        + " Seul le lien « telecharger » peut accepter les attributs de l'adresse.";
     case '42501':
       return 'Droits insuffisants sur la base.';
     default:

@@ -155,7 +155,8 @@ export function ShortLinkFormModal({
             </Field>
           </div>
           <p className="text-[11px] text-gray-400">
-            Cibles autorisées : https vers theresto.fr (app., hub., widget.), apps.apple.com, ou la fiche Google Play com.theresto…
+            Cibles autorisées : https vers theresto.fr, hub. ou widget. ; app.theresto.fr sauf /telecharger… ; une fiche App Store
+            (apps.apple.com/[pays/]app/[nom/]id…) ; la fiche Google Play com.theresto… Pas de « // » ni « .. » dans le chemin.
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

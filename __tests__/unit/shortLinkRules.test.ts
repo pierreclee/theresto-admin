@@ -61,6 +61,9 @@ describe('cibles autorisées (anti open redirect)', () => {
     'https://hub.theresto.fr?x=1',
     'https://widget.theresto.fr#a',
     'https://apps.apple.com/fr/app/theresto/id123',
+    'https://apps.apple.com/app/id123456789',
+    'https://apps.apple.com/app/theresto/id1?ct=x',
+    'https://play.google.com/store/apps/details?id=com.theresto',
     'https://play.google.com/store/apps/details?id=com.theresto.application',
     'https://play.google.com/store/apps/details?id=com.theresto.application&hl=fr',
   ])('%s', (url) => expect(isTargetAllowed(url, 'any')).toBe(true));
@@ -80,15 +83,26 @@ describe('cibles autorisées (anti open redirect)', () => {
     'https://play.google.com/store/apps/details?id=com.autre',
     'https://play.google.com/store/apps/details?id=com.theresto.app/../x',
     'https://apps.apple.com',
+    'https://apps.apple.com/fr/developer/theresto/id1',
+    'https://apps.apple.com/fr/app/theresto/id1/../x',
+    'https://play.google.com/store/apps/details?id=com.therestoevil',
+    'https://app.theresto.fr/telecharger',
+    'https://app.theresto.fr/TELECHARGER?src=x',
+    'https://app.theresto.fr/a%2F..',
+    'https://theresto.fr//evil.com',
+    'https://hub.theresto.fr/a/../b',
+    'https://hub.theresto.fr/.',
+    `https://app.theresto.fr/a${String.fromCharCode(0xfeff)}`,
     `https://app.theresto.fr/${'a'.repeat(2000)}`,
     'javascript:alert(1)',
   ])('%s refusée', (url) => expect(isTargetAllowed(url, 'any')).toBe(false));
 
   it('portées des réglages : App Store et fiche Play seulement', () => {
-    expect(isTargetAllowed('https://apps.apple.com/fr/app/x', 'app_store')).toBe(true);
+    expect(isTargetAllowed('https://apps.apple.com/fr/app/theresto/id1', 'app_store')).toBe(true);
+    expect(isTargetAllowed('https://apps.apple.com/fr/app/x', 'app_store')).toBe(false);
     expect(isTargetAllowed('https://app.theresto.fr/', 'app_store')).toBe(false);
     expect(isTargetAllowed('https://play.google.com/store/apps/details?id=com.theresto.application', 'play')).toBe(true);
-    expect(isTargetAllowed('https://apps.apple.com/fr/app/x', 'play')).toBe(false);
+    expect(isTargetAllowed('https://apps.apple.com/fr/app/theresto/id1', 'play')).toBe(false);
   });
 
   it('cible refusée : message de la règle', () => {
