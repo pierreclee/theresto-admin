@@ -6,6 +6,12 @@ import { useUpdateShortLinkSettings } from '@/lib/hooks/useShortLinks';
 import { validateShortLinkSettingsInput } from '@/lib/links/shortLinkRules';
 import type { ShortLinkSettings } from '@/lib/types/shortLinks';
 
+/** Conditions de mise en service, hors de l'admin (docs/features/short-links.md, §6). */
+export const GO_LIVE_NOTE =
+  'Mise en service : secret LINK_HIT_SECRET (32 caractères au moins, même valeur dans le Worker et le '
+  + "projet Supabase, sinon aucun scan n'est compté) et règle de limite de débit Cloudflare sur le "
+  + 'domaine des liens, obligatoire avant la prod.';
+
 const inputClass =
   'w-full text-sm border border-gray-200 rounded-xl px-3 py-2 focus:outline-none focus:border-[#FF6B35] focus:ring-2 focus:ring-[#FF6B35]/20';
 
@@ -67,6 +73,7 @@ export function ShortLinkSettingsCard({ settings }: { settings: ShortLinkSetting
           <p className="text-xs text-gray-400 mt-0.5">
             Pour les liens « téléchargement » sans cible propre. Vides tant que les fiches ne sont pas publiées : l&apos;App en attendant.
           </p>
+          <p className="text-xs text-gray-400 mt-1">{GO_LIVE_NOTE}</p>
         </div>
         {!editing && (
           <button onClick={start} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 rounded-lg hover:text-[#FF6B35] hover:border-[#FF6B35]/30 hover:bg-orange-50 flex-shrink-0">
@@ -78,7 +85,7 @@ export function ShortLinkSettingsCard({ settings }: { settings: ShortLinkSetting
       {editing ? (
         <div className="p-5 space-y-3">
           {([
-            ['appStoreUrl', 'App Store', 'https://apps.apple.com/fr/app/…'],
+            ['appStoreUrl', "App Store (fiche de l'app)", 'https://apps.apple.com/fr/app/theresto/id123456789'],
             ['playStoreUrl', 'Google Play', 'https://play.google.com/store/apps/details?id=com.theresto.application'],
             ['appStoreProviderToken', 'Provider token App Store (facultatif, chiffres)', ''],
           ] as const).map(([key, label, placeholder]) => (

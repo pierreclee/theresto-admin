@@ -55,12 +55,20 @@ function CsvButton({ linkId, days }: { linkId: string | null; days: StatsPeriod 
   );
 }
 
+export const ATTRIBUTES_NOTE =
+  "Source, ville et persona : ceux du lien. Seul le lien « telecharger » reprend ceux de l'adresse "
+  + '(?src=…&ville=…&persona=…). Persona : client, pro ou aucune. « autre » en source ou en ville : '
+  + 'valeur mal formée, ou plus de 50 combinaisons différentes pour ce lien dans la journée.';
+
 function Reminder() {
   return (
-    <p className="flex gap-2 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-      <Info size={14} className="shrink-0 mt-0.5 text-gray-400" />
-      {SCANS_NOT_INSTALLS}
-    </p>
+    <div className="space-y-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+      <p className="flex gap-2">
+        <Info size={14} className="shrink-0 mt-0.5 text-gray-400" />
+        {SCANS_NOT_INSTALLS}
+      </p>
+      <p className="pl-6">{ATTRIBUTES_NOTE}</p>
+    </div>
   );
 }
 
