@@ -173,7 +173,7 @@ describe('réglages des stores', () => {
 describe('domaine et URL du QR', () => {
   it('domaine selon l environnement', () => {
     expect(shortLinkDomain('production')).toBe('go.theresto.fr');
-    expect(shortLinkDomain('staging')).toBe('go-staging.theresto.fr');
+    expect(shortLinkDomain('staging')).toBe('theresto-go-staging.pierrecleepro.workers.dev');
   });
 
   it('toujours https://<domaine>/<slug>', () => {

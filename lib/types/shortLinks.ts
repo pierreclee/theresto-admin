@@ -49,7 +49,7 @@ export interface ShortLinkSettings {
 export interface ShortLinksPage {
   links: (ShortLink & { scans30d: number })[];
   settings: ShortLinkSettings | null;
-  /** go.theresto.fr ou go-staging.theresto.fr, selon l'environnement du serveur. */
+  /** go.theresto.fr ou theresto-go-staging.pierrecleepro.workers.dev, selon l'environnement du serveur. */
   domain: string;
   /** Scans des 30 derniers jours vers un lien inconnu (slug inexistant, jamais gardé). */
   unknownScans30d: number;

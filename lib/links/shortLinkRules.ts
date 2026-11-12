@@ -252,7 +252,7 @@ export function changedFields<T extends object>(before: Partial<T>, after: T): (
 
 /** Domaine des liens courts de l'environnement choisi à la connexion (cookie theresto_env). */
 export function shortLinkDomain(env: AppEnvironment): string {
-  return env === 'production' ? 'go.theresto.fr' : 'go-staging.theresto.fr';
+  return env === 'production' ? 'go.theresto.fr' : 'theresto-go-staging.pierrecleepro.workers.dev';
 }
 
 /** URL encodée dans le QR : toujours https://<domaine>/<slug>, slug en minuscules. */

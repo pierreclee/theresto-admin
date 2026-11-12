@@ -79,8 +79,8 @@ __tests__/
 ## Liens & QR (P10)
 
 Page `/links` (entrée « Liens & QR » de la barre latérale) : liens courts `https://go.theresto.fr/<slug>`
-(`go-staging.theresto.fr` quand l'environnement choisi à la connexion, cookie `theresto_env`, est
-staging). Contrat côté serveur : `docs/features/short-links.md` du dépôt theresto_app.
+(`theresto-go-staging.pierrecleepro.workers.dev`, adresse workers.dev du Worker de staging, quand
+l'environnement choisi à la connexion, cookie `theresto_env`, est staging). Contrat côté serveur : `docs/features/short-links.md` du dépôt theresto_app.
 
 - **Liens** : création, modification, désactivation / réactivation, jamais de suppression (un lien
   imprimé se désactive, ses scans restent comptés). Server Actions `lib/actions/shortLinks.ts`, sous

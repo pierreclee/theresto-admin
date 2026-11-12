@@ -65,7 +65,7 @@ describe('matrice', () => {
 
   it('avec logo : correction H, zone centrée, vide, au plus 20 % de la surface', () => {
     for (const slug of ['ab', 'telecharger', 'a'.repeat(40)]) {
-      const m = buildQrMatrix(shortLinkUrl('go-staging.theresto.fr', slug), { withLogo: true });
+      const m = buildQrMatrix(shortLinkUrl('theresto-go-staging.pierrecleepro.workers.dev', slug), { withLogo: true });
       expect(m.errorCorrection).toBe('H');
       expect(m.logo).not.toBeNull();
       const { start, span } = m.logo!;
