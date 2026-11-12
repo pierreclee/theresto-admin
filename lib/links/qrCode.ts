@@ -109,14 +109,39 @@ export function checkQrColors(darkColor: string, lightColor: string): ColorCheck
 
 // ─── SVG ────────────────────────────────────────────────────────────────────
 
-/** Place le SVG du logo (fichier de public/) dans le QR : x, y, côté en unités de module. */
-export function nestLogoSvg(logoSvg: string, x: number, y: number, side: number): string {
-  const svg = logoSvg.replace(/<\?xml[^>]*\?>/i, '').trim();
+/** Arrondi court pour les attributs (évite 0.30000000000000004). */
+function fmt(n: number): string {
+  return String(Math.round(n * 1e6) / 1e6);
+}
+
+/**
+ * Place le logo (fichier SVG de public/) dans le QR : x, y, côté en unités de module.
+ * Le contenu du logo est recopié dans un `<g transform="translate(…) scale(…)">`, jamais dans
+ * un `<svg x y>` imbriqué : MuPDF et des logiciels d'imprimeur ignorent x/y d'un `<svg>`
+ * imbriqué et posent alors le logo en haut à gauche, sur un motif de repérage (QR illisible).
+ * Mise à l'échelle uniforme et centrée, comme le `xMidYMid meet` par défaut du viewBox.
+ */
+export function placeLogoSvg(logoSvg: string, x: number, y: number, side: number): string {
+  const svg = logoSvg.replace(/<\?xml[^>]*\?>/i, '').replace(/<!--[\s\S]*?-->/g, '').trim();
   // Notre propre fichier, mais on refuse tout ce qui chargerait ou exécuterait quelque chose.
   if (!svg.startsWith('<svg') || /<script|<foreignObject|\shref=|xlink:href|\son[a-z]+=/i.test(svg)) {
     throw new Error('Logo SVG refusé');
   }
-  return svg.replace(/^<svg/, `<svg x="${x}" y="${y}" width="${side}" height="${side}"`);
+  const open = /^<svg\b([^>]*)>/i.exec(svg);
+  const closeAt = svg.lastIndexOf('</svg>');
+  if (!open || closeAt < open[0].length) throw new Error('Logo SVG refusé');
+  const inner = svg.slice(open[0].length, closeAt).trim();
+  if (/<svg\b/i.test(inner)) throw new Error('Logo SVG refusé');
+  const viewBox = /\sviewBox="([^"]*)"/i.exec(open[1]);
+  const box = viewBox ? viewBox[1].trim().split(/[\s,]+/).map(Number) : [];
+  if (box.length !== 4 || box.some((v) => !Number.isFinite(v)) || box[2] <= 0 || box[3] <= 0) {
+    throw new Error('Logo SVG refusé : viewBox attendu');
+  }
+  const [minX, minY, w, h] = box;
+  const scale = side / Math.max(w, h);
+  const tx = x + (side - w * scale) / 2 - minX * scale;
+  const ty = y + (side - h * scale) / 2 - minY * scale;
+  return `<g transform="translate(${fmt(tx)} ${fmt(ty)}) scale(${fmt(scale)})">${inner}</g>`;
 }
 
 /**
@@ -154,7 +179,7 @@ export function qrSvg(
     // Fond blanc et marge d'un demi-module (au moins) autour du logo.
     const margin = Math.max(0.5, matrix.logo.span * 0.08);
     parts.push(`<rect x="${start}" y="${start}" width="${matrix.logo.span}" height="${matrix.logo.span}" fill="#FFFFFF"/>`);
-    parts.push(nestLogoSvg(options.logoSvg, start + margin, start + margin, matrix.logo.span - margin * 2));
+    parts.push(placeLogoSvg(options.logoSvg, start + margin, start + margin, matrix.logo.span - margin * 2));
   }
   parts.push('</svg>');
   return parts.join('');

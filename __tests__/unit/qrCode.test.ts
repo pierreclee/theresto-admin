@@ -14,7 +14,7 @@ import {
   contrastRatio,
   logoAreaRatio,
   MAX_LOGO_AREA,
-  nestLogoSvg,
+  placeLogoSvg,
   qrSvg,
   QUIET_ZONE_MODULES,
 } from '@/lib/links/qrCode';
@@ -98,7 +98,29 @@ describe('SVG', () => {
     const svg = qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logoSvg: LOGO });
     expect(svg).toContain('fill="#FF6B35"');
     expect(svg).not.toMatch(/href=|<image/);
-    expect((svg.match(/<svg/g) ?? []).length).toBe(2);
+    // Un seul <svg> (la racine) : pas de <svg x y> imbriqué, que MuPDF et des logiciels
+    // d'imprimeur posent en haut à gauche, sur un motif de repérage.
+    expect((svg.match(/<svg/g) ?? []).length).toBe(1);
+    const { start, span } = m.logo!;
+    const q = QUIET_ZONE_MODULES;
+    const margin = Math.max(0.5, span * 0.08);
+    const side = span - margin * 2;
+    const at = start + q + margin;
+    const round = (n: number) => String(Math.round(n * 1e6) / 1e6);
+    // Logo de viewBox 0 0 100 100 : translation au coin de la zone, échelle côté / 100.
+    expect(svg).toContain(`<g transform="translate(${round(at)} ${round(at)}) scale(${round(side / 100)})">`);
+    // Fond blanc de la zone du logo inchangé, sous le logo.
+    const bg = `<rect x="${start + q}" y="${start + q}" width="${span}" height="${span}" fill="#FFFFFF"/>`;
+    expect(svg).toContain(bg);
+    expect(svg.indexOf(bg)).toBeLessThan(svg.indexOf('<g transform='));
+  });
+
+  it('logo non carré ou décalé : centré dans sa zone, viewBox compensé', () => {
+    const g = placeLogoSvg('<svg viewBox="10 20 200 100"><rect width="1" height="1"/></svg>', 5, 5, 10);
+    // échelle 10/200 = 0.05 ; hauteur 5 centrée (+2.5) ; origine du viewBox ramenée à 0.
+    expect(g).toBe('<g transform="translate(4.5 6.5) scale(0.05)"><rect width="1" height="1"/></g>');
+    expect(() => placeLogoSvg('<svg width="10" height="10"></svg>', 0, 0, 1)).toThrow();
+    expect(() => placeLogoSvg('<svg viewBox="0 0 1 1"><svg/></svg>', 0, 0, 1)).toThrow();
   });
 
   it('couleurs refusées : pas de SVG', () => {
@@ -107,10 +129,10 @@ describe('SVG', () => {
   });
 
   it('logo qui chargerait ou exécuterait quelque chose : refusé', () => {
-    expect(() => nestLogoSvg('<svg><script>alert(1)</script></svg>', 0, 0, 1)).toThrow();
-    expect(() => nestLogoSvg('<svg><image href="https://x"/></svg>', 0, 0, 1)).toThrow();
-    expect(() => nestLogoSvg('<svg onload="x()"></svg>', 0, 0, 1)).toThrow();
-    expect(nestLogoSvg(LOGO, 1, 2, 3)).toMatch(/^<svg x="1" y="2" width="3" height="3"/);
+    expect(() => placeLogoSvg('<svg><script>alert(1)</script></svg>', 0, 0, 1)).toThrow();
+    expect(() => placeLogoSvg('<svg><image href="https://x"/></svg>', 0, 0, 1)).toThrow();
+    expect(() => placeLogoSvg('<svg onload="x()"></svg>', 0, 0, 1)).toThrow();
+    expect(placeLogoSvg(LOGO, 1, 2, 3)).toMatch(/^<g transform="translate\(1 2\) scale\(0\.03\)">/);
   });
 });
 
