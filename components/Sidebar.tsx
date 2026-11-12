@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Clock,
   AlertTriangle,
+  QrCode,
 } from 'lucide-react';
 
 const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
@@ -26,6 +27,7 @@ const routes: { href: string; label: string; icon: React.ElementType; exact?: bo
   { href: '/restaurants', label: 'Restaurants', icon: Store },
   { href: '/users', label: 'Utilisateurs', icon: Users },
   { href: '/incidents', label: 'Incidents de paiement', icon: AlertTriangle },
+  { href: '/links', label: 'Liens & QR', icon: QrCode },
   { href: '/monitoring', label: 'Monitoring', icon: Activity },
   { href: '/config', label: 'Configuration', icon: Settings },
 ];

@@ -16,6 +16,11 @@ const EXEMPT: Record<string, string> = {
   getStatsAction: 'comptes agrégés, aucune donnée personnelle (D1)',
   getConfigAction: 'réglages de la plateforme, non personnels (D1)',
   getAuditLogsAction: 'lecture du journal lui-même (D1)',
+  // appVersionSettings.ts
+  getAppVersionPoliciesAction: 'versions minimale et recommandée de l app, non personnelles',
+  updateAppVersionPolicyAction:
+    'journalisée par l Edge Function app-version-settings (update_app_version_policy), '
+    + 'modification annulée et refusée (503) si le journal échoue',
   // billing.ts
   getRevenueSummaryAction: 'agrégats de revenus du restaurant (RPC admin_restaurant_revenue_summary), non personnels',
   getStripeOverviewAction:
@@ -42,6 +47,12 @@ const EXEMPT: Record<string, string> = {
   retryPrivatizationRefundAction: 'journalisée par l Edge Function admin-privatization-incidents',
   returnPrivatizationCustomerBalanceAction: 'journalisée par l Edge Function admin-privatization-incidents',
   resolvePrivatizationIncidentAction: 'journalisée par l Edge Function admin-privatization-incidents',
+  // shortLinks.ts
+  listShortLinksAction: 'liens courts et compteurs de scans agrégés, aucune donnée personnelle',
+  getShortLinkAction: 'un lien court (cibles, attributs), aucune donnée personnelle',
+  getShortLinkStatsAction: 'agrégats de link_visit_daily (jour, plateforme, pays), aucune donnée personnelle',
+  getShortLinksOverviewAction: 'agrégats de link_visit_daily groupés par persona, ville, campagne',
+  exportShortLinkStatsCsvAction: 'CSV des agrégats de link_visit_daily, aucune donnée personnelle',
   // subscriptionPrices.ts
   getSubscriptionPricesAction: 'prix Stripe des abonnements, non personnels',
   updateSubscriptionPriceAction: 'journalisée par l Edge Function subscription-prices',

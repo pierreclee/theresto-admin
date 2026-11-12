@@ -61,7 +61,7 @@ export function parisDayStart(day: string, addDays = 0): Date | null {
 // Actions écrites dans platform_logs (RGPD-29) : Server Actions de theresto-admin et Edge
 // Functions admin de theresto_app (admin-onboarding, admin-restaurant-billing,
 // admin-privatization-incidents, commission-settings, subscription-prices, migration-tools,
-// cron-invoice-commissions).
+// cron-invoice-commissions, app-version-settings).
 export const AUDIT_ACTION_LABELS: Record<string, string> = {
   list_users: 'Liste des utilisateurs consultée',
   view_user: 'Utilisateur consulté',
@@ -96,6 +96,12 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   resolve_privatization_incident: 'Incident traité',
   backfill_platform_revenue: 'Revenus de la plateforme recalculés',
   commission_invoice_failed: 'Facture de commissions en échec',
+  create_short_link: 'Lien court créé',
+  update_short_link: 'Lien court modifié',
+  deactivate_short_link: 'Lien court désactivé',
+  reactivate_short_link: 'Lien court réactivé',
+  update_short_link_settings: 'Liens des stores modifiés',
+  update_app_version_policy: 'Versions de l’app modifiées',
 };
 
 export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
@@ -109,6 +115,8 @@ export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
   privatization_incident: 'Incident',
   commission_invoice: 'Facture',
   platform: 'Plateforme',
+  link: 'Lien court',
+  app_version_policy: 'Versions de l’app',
 };
 
 function toOptions(labels: Record<string, string>): { value: string; label: string }[] {
@@ -154,6 +162,8 @@ const CODE_KEYS: Record<string, string> = {
   refundStatus: 'Statut du remboursement',
   currency: 'Devise',
   period: 'Période',
+  slug: 'Lien',
+  previousSlug: 'Ancien lien',
 };
 const EURO = new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' });
 

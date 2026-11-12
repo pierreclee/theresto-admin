@@ -6,7 +6,8 @@
 import { getAdminClient } from '@/lib/supabase/server';
 import { ADMIN_LOG_FAILED_MESSAGE } from '@/lib/audit/messages';
 
-export type AdminTargetType = 'user' | 'restaurant' | 'kbis' | 'config';
+// link : liens courts et QR codes (P10), réglages des stores compris (target_id 'short_link_settings').
+export type AdminTargetType = 'user' | 'restaurant' | 'kbis' | 'config' | 'link';
 
 export interface AdminLogEntry {
   action: string;
@@ -23,8 +24,9 @@ export interface AdminActor {
 export { ADMIN_LOG_FAILED_MESSAGE } from '@/lib/audit/messages';
 
 /**
- * Refus d'une consultation faute de journal (D2). Renvoyé, jamais levé : Next.js masque en
- * production le message d'une exception levée par une Server Action.
+ * Refus d'une consultation, ou d'une modification annulée, faute de journal (D2). Renvoyé,
+ * jamais levé : Next.js masque en production le message d'une exception levée par une
+ * Server Action. Modification : message ADMIN_LOG_WRITE_FAILED_MESSAGE.
  */
 export interface AdminLogRefusal {
   ok: false;
@@ -32,8 +34,8 @@ export interface AdminLogRefusal {
   error: string;
 }
 
-export function adminLogRefusal(): AdminLogRefusal {
-  return { ok: false, code: 'audit-log-failed', error: ADMIN_LOG_FAILED_MESSAGE };
+export function adminLogRefusal(message: string = ADMIN_LOG_FAILED_MESSAGE): AdminLogRefusal {
+  return { ok: false, code: 'audit-log-failed', error: message };
 }
 
 /** Écrit la ligne ; false si l'écriture échoue (jamais d'exception). */
