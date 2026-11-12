@@ -5,6 +5,11 @@
 // écriture avec la clé service, derrière requireAdmin(). Contrat : docs/features/short-links.md
 // du dépôt theresto_app.
 //
+// Droits de service_role (migration) : short_links SELECT/INSERT/UPDATE/DELETE (DELETE
+// seulement pour annuler une création non journalisée), short_link_settings SELECT/UPDATE
+// (UPDATE de la ligne unique, jamais d'INSERT ni d'upsert), link_visit_daily SELECT.
+// short_link_resolve (réservée au Worker) n'est pas utilisée ici.
+//
 // Écritures : validées ici (mêmes règles que la base, qui fait foi), contrôle de concurrence
 // par updated_at, puis journal platform_logs (target_type 'link', slug et noms des champs
 // seulement). Journal impossible : l'écriture est annulée (valeurs d'avant remises, lien
@@ -50,7 +55,7 @@ import type {
 } from '@/lib/types/shortLinks';
 
 // Une seule chaîne littérale : supabase-js en déduit le type des lignes.
-const LINK_COLUMNS = 'id, slug, label, kind, target_default, target_ios, target_android, forward_params, src, ville, persona, campaign, active, expires_at, created_at, updated_at';
+const LINK_COLUMNS = 'id, slug, label, kind, target_default, target_ios, target_android, forward_params, src, ville, persona, campaign, accepts_query_attributes, active, expires_at, created_at, updated_at';
 const SETTINGS_COLUMNS = 'app_store_url, play_store_url, app_store_provider_token, updated_at, updated_by';
 const SETTINGS_TARGET_ID = 'short_link_settings';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,6 +65,8 @@ const VISIT_MAX_PAGES = 100;
 
 type ShortLinkRow = ShortLinkColumns & {
   id: string;
+  /** Lecture seule : vrai seulement pour « telecharger » (contrainte de la base), jamais écrit ici. */
+  accepts_query_attributes: boolean;
   active: boolean;
   created_at: string;
   updated_at: string;
@@ -82,6 +89,7 @@ function toShortLink(row: ShortLinkRow): ShortLink {
     ville: row.ville,
     persona: row.persona,
     campaign: row.campaign,
+    acceptsQueryAttributes: row.accepts_query_attributes === true,
     active: row.active,
     expiresAt: row.expires_at,
     createdAt: row.created_at,

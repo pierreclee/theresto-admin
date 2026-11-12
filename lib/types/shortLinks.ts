@@ -15,6 +15,8 @@ export interface ShortLink {
   ville: string | null;
   persona: ShortLinkPersona | null;
   campaign: string | null;
+  /** src / ville / persona de l'adresse (?src=…) comptés : lien « telecharger » seulement, lecture seule. */
+  acceptsQueryAttributes: boolean;
   active: boolean;
   expiresAt: string | null;
   createdAt: string;

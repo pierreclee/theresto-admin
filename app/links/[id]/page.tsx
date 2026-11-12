@@ -73,6 +73,7 @@ export default function ShortLinkDetailPage({ params }: { params: Promise<{ id: 
             ['Ville', link.ville ?? '—'],
             ['Campagne', link.campaign ?? '—'],
             ['Source', link.src ?? '—'],
+            ["Accepte src/ville/persona de l'adresse", link.acceptsQueryAttributes ? 'oui (ancien lien /telecharger?src=…)' : 'non'],
             ['Expiration', link.expiresAt ? new Date(link.expiresAt).toLocaleString('fr-FR') : 'aucune'],
           ] as const).map(([label, value]) => (
             <div key={label}>

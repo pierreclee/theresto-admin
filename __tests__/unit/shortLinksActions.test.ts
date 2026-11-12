@@ -275,3 +275,29 @@ describe('lectures (agrégats, sans journal)', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('droits de service_role (migration)', () => {
+  it('accepts_query_attributes n est jamais écrit (lecture seule, telecharger seulement)', async () => {
+    await createShortLinkAction({ ...input, acceptsQueryAttributes: true });
+    await updateShortLinkAction(ID, { ...input, ville: 'paris', acceptsQueryAttributes: true }, T0);
+    for (const call of writes()) expect(JSON.stringify(call.payload)).not.toContain('accepts_query_attributes');
+  });
+
+  it('ni INSERT, ni DELETE, ni upsert sur short_link_settings et link_visit_daily ; pas de short_link_resolve', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const src: string = require('fs').readFileSync(require('path').resolve(__dirname, '../../lib/actions/shortLinks.ts'), 'utf8');
+    expect(src).not.toMatch(/\.upsert\(/);
+    expect(src).not.toMatch(/short_link_resolve'|rpc\(/);
+    for (const table of ['short_link_settings', 'link_visit_daily']) {
+      const uses = src.split(`from('${table}')`).slice(1).map((rest) => rest.slice(0, 200));
+      for (const use of uses) expect(use).not.toMatch(/^\s*\.(insert|delete)\(/);
+    }
+  });
+
+  it('la fiche expose accepts_query_attributes en lecture', async () => {
+    respond = () => ({ data: { ...row, slug: 'telecharger', accepts_query_attributes: true }, error: null });
+    const { getShortLinkAction } = await import('@/lib/actions/shortLinks');
+    const r = await getShortLinkAction(ID);
+    expect(r.ok && r.data.link.acceptsQueryAttributes).toBe(true);
+  });
+});
