@@ -183,3 +183,18 @@ describe('getAuditLogsAction : filtres action et type', () => {
     expect(calls.some(([m]) => m === 'eq')).toBe(false);
   });
 });
+
+describe('Monitoring : liens courts et versions de l app (P10)', () => {
+  it('libellés des actions et des types', () => {
+    expect(AUDIT_ACTION_LABELS.create_short_link).toBe('Lien court créé');
+    expect(AUDIT_ACTION_LABELS.deactivate_short_link).toBe('Lien court désactivé');
+    expect(AUDIT_ACTION_LABELS.update_app_version_policy).toBeDefined();
+    expect(AUDIT_RESOURCE_LABELS.link).toBe('Lien court');
+    expect(AUDIT_RESOURCE_LABELS.app_version_policy).toBeDefined();
+  });
+
+  it('détails : slug et noms des champs', () => {
+    expect(formatAuditDetails({ slug: 'flyer-paris', previousSlug: 'flyer-lyon', fields: ['slug', 'ville'] }))
+      .toBe('Lien : flyer-paris · Ancien lien : flyer-lyon · Champs : slug, ville');
+  });
+});

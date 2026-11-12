@@ -4,6 +4,10 @@
 export const ADMIN_LOG_FAILED_MESSAGE =
   "Consultation impossible : le journal d'administration n'a pas pu être écrit. Réessayez.";
 
+/** Refus d'une modification faute de journal : l'écriture a été annulée (remise à l'état d'avant). */
+export const ADMIN_LOG_WRITE_FAILED_MESSAGE =
+  "Modification annulée : le journal d'administration n'a pas pu être écrit. Réessayez.";
+
 /**
  * Message d'une Edge Function de theresto_app qui refuse une consultation faute de journal
  * (AUDIT_LOG_UNAVAILABLE de supabase/functions/_shared/platform-log.ts, renvoyé en 500
