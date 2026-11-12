@@ -42,6 +42,12 @@ const EXEMPT: Record<string, string> = {
   retryPrivatizationRefundAction: 'journalisée par l Edge Function admin-privatization-incidents',
   returnPrivatizationCustomerBalanceAction: 'journalisée par l Edge Function admin-privatization-incidents',
   resolvePrivatizationIncidentAction: 'journalisée par l Edge Function admin-privatization-incidents',
+  // shortLinks.ts
+  listShortLinksAction: 'liens courts et compteurs de scans agrégés, aucune donnée personnelle',
+  getShortLinkAction: 'un lien court (cibles, attributs), aucune donnée personnelle',
+  getShortLinkStatsAction: 'agrégats de link_visit_daily (jour, plateforme, pays), aucune donnée personnelle',
+  getShortLinksOverviewAction: 'agrégats de link_visit_daily groupés par persona, ville, campagne',
+  exportShortLinkStatsCsvAction: 'CSV des agrégats de link_visit_daily, aucune donnée personnelle',
   // subscriptionPrices.ts
   getSubscriptionPricesAction: 'prix Stripe des abonnements, non personnels',
   updateSubscriptionPriceAction: 'journalisée par l Edge Function subscription-prices',
