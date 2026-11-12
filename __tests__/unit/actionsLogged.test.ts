@@ -16,6 +16,11 @@ const EXEMPT: Record<string, string> = {
   getStatsAction: 'comptes agrégés, aucune donnée personnelle (D1)',
   getConfigAction: 'réglages de la plateforme, non personnels (D1)',
   getAuditLogsAction: 'lecture du journal lui-même (D1)',
+  // appVersionSettings.ts
+  getAppVersionPoliciesAction: 'versions minimale et recommandée de l app, non personnelles',
+  updateAppVersionPolicyAction:
+    'journalisée par l Edge Function app-version-settings (update_app_version_policy), '
+    + 'modification annulée et refusée (503) si le journal échoue',
   // billing.ts
   getRevenueSummaryAction: 'agrégats de revenus du restaurant (RPC admin_restaurant_revenue_summary), non personnels',
   getStripeOverviewAction:

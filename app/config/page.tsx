@@ -14,6 +14,7 @@ import { OnlineCommissionRatesCard } from '@/components/config/OnlineCommissionR
 import { PrivatizationCommissionRatesCard } from '@/components/config/PrivatizationCommissionRatesCard';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
+import { AppVersionPoliciesCard } from '@/components/config/AppVersionPoliciesCard';
 
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
@@ -190,6 +191,9 @@ export default function ConfigPage() {
 
       {/* Booking commissions (Essentiel plan) */}
       <CommissionRatesCard />
+
+      {/* Version minimale et recommandée de l'app mobile (Edge Function app-version-settings) */}
+      <AppVersionPoliciesCard />
 
       {/* Registre des revenus (reprise depuis Stripe) */}
       <RevenueBackfillCard />
