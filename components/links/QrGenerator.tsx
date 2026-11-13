@@ -38,7 +38,7 @@ export function QrGenerator({ domain, slug, defaultTitle }: { domain: string; sl
   const matrix = useMemo(() => buildQrMatrix(url, { withLogo }), [url, withLogo]);
   const svg = useMemo(() => {
     if (!colorCheck.ok || !logoReady) return null;
-    return qrSvg(matrix, { darkColor, lightColor, logoSvg: logoSvg ?? undefined, pixels: 512 });
+    return qrSvg(matrix, { darkColor, lightColor, logo: logoSvg ? { kind: 'svg', markup: logoSvg } : undefined, pixels: 512 });
   }, [matrix, darkColor, lightColor, logoSvg, colorCheck.ok, logoReady]);
   const previewUrl = useMemo(() => (svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null), [svg]);
 
