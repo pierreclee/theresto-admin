@@ -90,7 +90,8 @@ l'environnement choisi à la connexion, cookie `theresto_env`, est staging). Con
 - **Liens des stores** (`short_link_settings`) : App Store, Google Play, provider token App Store.
 - **Journal** : chaque écriture écrit une ligne de `platform_logs` avec `target_type = 'link'`
   (`create_short_link`, `update_short_link`, `deactivate_short_link`, `reactivate_short_link`,
-  `update_short_link_settings` avec `target_id = 'short_link_settings'`), `details` = slug et noms des
+  `update_short_link_settings` avec `target_id = 'short_link_settings'`, `update_short_link_qr_style`,
+  `upload_qr_logo` et `discard_qr_logo` : extension et taille du fichier seulement), `details` = slug et noms des
   champs modifiés seulement (jamais le libellé ni une URL). Si le journal ne s'écrit pas, l'écriture est
   annulée (valeurs d'avant remises, lien tout juste créé retiré) et l'action refusée (`audit-log-failed`).
 - **QR** : généré dans le navigateur, sans service tiers (`qrcode` et `pdf-lib`, MIT) ; il encode
@@ -98,6 +99,22 @@ l'environnement choisi à la connexion, cookie `theresto_env`, est staging). Con
   la surface, fond blanc), zone de silence de 4 modules, contraste d'au moins 4:1 (fond plus sombre
   refusé). Exports SVG, PNG 2000 px et PDF A5 (titre saisi, jamais le libellé interne, et URL courte).
   La CSP existante suffit (`img-src data: blob:`, téléchargements par URL `blob:`).
+- **Style du QR, enregistré par lien** (`short_links.qr_style`, NULL = style par défaut) : forme des
+  petits modules (carrés, arrondis, points, losanges, étoiles), cadre et point des 3 repères des coins
+  (carré, arrondi, rond, feuille, réglés séparément ; formes différentes : note de test à l'impression),
+  couleurs, logo (aucun, TheResto, fichier importé SVG / PNG / JPEG de 512 Kio au plus). Validé par
+  `parseQrStyle` (`lib/links/qrStyle.ts`, mêmes règles que la base) ; enregistré par
+  `saveShortLinkQrStyleAction` (concurrence par `updated_at`, journal, style remis si le journal échoue).
+  Les exports reprennent le style affiché, enregistré ou non.
+- **Logos importés** : bucket privé `qr-logos` (clé service seulement), fichier `<uuid>.(svg|png|jpg)` à la
+  racine. Contrôlé dans le navigateur à l'import (aperçu) puis par le serveur avec la même fonction
+  (`checkLogoBytes`, `lib/links/qrLogoFile.ts` : extension et octets concordants, SVG filtré). Envoyé
+  seulement à « Enregistrer le style » (`uploadQrLogoAction`, `upsert: false`, fichier retiré si le
+  journal échoue) ; retiré si le style n'est pas enregistré (`discardQrLogoAction`, refusé pour un
+  fichier cité par un lien) ; l'ancien logo d'un lien est supprimé quand plus aucun lien ne le cite.
+  Lu par `readQrLogoAction` (contenu revérifié) : jamais d'URL signée dans le navigateur, aucune
+  ouverture de la CSP. Un fichier peut rester sans lien (fenêtre fermée entre l'envoi et
+  l'enregistrement) : sans conséquence, jamais servi.
 - **Statistiques** : scans par jour (30 / 90 jours), plateformes, pays, part de robots exclus, vue
   d'ensemble par persona, ville et campagne, export CSV. Ce sont des scans, pas des installations
   (App Store Connect, Play Console). Lecture d'agrégats sans donnée personnelle : non journalisée.

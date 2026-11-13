@@ -3,20 +3,26 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createShortLinkAction,
+  discardQrLogoAction,
   exportShortLinkStatsCsvAction,
   getShortLinkAction,
   getShortLinksOverviewAction,
   getShortLinkStatsAction,
   listShortLinksAction,
+  readQrLogoAction,
+  saveShortLinkQrStyleAction,
   setShortLinkActiveAction,
   updateShortLinkAction,
   updateShortLinkSettingsAction,
+  uploadQrLogoAction,
 } from '@/lib/actions/shortLinks';
 import { ActionError, shouldRetryQuery, unwrapAction } from '@/lib/api/actionResult';
 import { useToast } from '@/components/shared/Toaster';
 import { downloadBlob } from '@/lib/links/browserFiles';
 import type { StatsPeriod } from '@/lib/links/linkStats';
-import type { ShortLinkFormValues } from '@/lib/types/shortLinks';
+import type { LogoSource } from '@/lib/links/qrCode';
+import type { QrStyle } from '@/lib/links/qrStyle';
+import type { ShortLink, ShortLinkDetail, ShortLinkFormValues } from '@/lib/types/shortLinks';
 
 // Les messages des actions sont déjà en français (refus de la base traduits côté serveur).
 // Une exception de l'action elle-même (session expirée, second facteur) arrive masquée en
@@ -143,4 +149,61 @@ export async function downloadShortLinkStatsCsv(linkId: string | null, days: Sta
   // BOM : accents lisibles dans Excel.
   downloadBlob(new Blob([String.fromCharCode(0xfeff), data.csv], { type: 'text/csv;charset=utf-8' }), data.filename);
   return data.truncated;
+}
+
+/** Logo importé d'un style enregistré, lu par le serveur (jamais d'URL signée dans le navigateur). */
+export function useQrLogo(logoPath: string | null) {
+  return useQuery({
+    queryKey: ['qrLogo', logoPath],
+    queryFn: () => read(readQrLogoAction(logoPath!)),
+    enabled: !!logoPath,
+    retry: (count: number, e: Error) => !(e instanceof ActionError) && shouldRetryQuery(count, e),
+    staleTime: Infinity,
+  });
+}
+
+/** Style à enregistrer : un logo importé encore jamais envoyé arrive avec son fichier. */
+export type QrStyleDraft =
+  | { style: QrStyle; file?: undefined }
+  | { style: Omit<QrStyle, 'logo' | 'logoPath'> & { logo: 'custom' }; file: File; source: LogoSource };
+
+/**
+ * Envoie le logo importé (s'il y en a un nouveau) puis enregistre le style. Le fichier n'est
+ * déposé qu'à l'enregistrement : un import abandonné ne laisse rien dans le bucket. Si le
+ * style n'est pas enregistré (conflit, refus), le fichier tout juste déposé est retiré.
+ */
+export function useSaveQrStyle() {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const invalidate = useInvalidateLinks();
+  return useMutation({
+    mutationFn: async ({ link, draft }: { link: ShortLink; draft: QrStyleDraft }) => {
+      let style: QrStyle;
+      let uploaded: string | null = null;
+      if (draft.file) {
+        const form = new FormData();
+        form.append('linkId', link.id);
+        form.append('file', draft.file, draft.file.name);
+        uploaded = (await write(uploadQrLogoAction(form))).logoPath;
+        style = { ...draft.style, logo: 'custom', logoPath: uploaded };
+        queryClient.setQueryData(['qrLogo', uploaded], draft.source);
+      } else {
+        style = draft.style;
+      }
+      try {
+        return await write(saveShortLinkQrStyleAction(link.id, style, link.updatedAt));
+      } catch (e) {
+        if (uploaded) {
+          const path = uploaded;
+          discardQrLogoAction(link.id, path).catch(() => console.error('[liens] logo non retiré', path));
+        }
+        throw e;
+      }
+    },
+    onSuccess: (link) => {
+      queryClient.setQueryData<ShortLinkDetail>(['shortLink', link.id], (old) => (old ? { ...old, link } : old));
+      toast('Style du QR enregistré');
+    },
+    onSettled: invalidate,
+  });
 }

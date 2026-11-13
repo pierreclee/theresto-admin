@@ -3,14 +3,10 @@
 // Fichiers produits dans le navigateur (QR, CSV) : aucun service tiers. Les téléchargements
 // passent par une URL blob: locale (la CSP n'a rien à autoriser de plus : img-src data: blob:).
 
-import {
-  bytesToBase64,
-  MAX_LOGO_BYTES,
-  rasterLogoError,
-  rasterMimeOf,
-  sanitizeLogoSvg,
-  type LogoSource,
-} from './qrCode';
+import { MAX_LOGO_BYTES } from './qrCode';
+import { checkLogoBytes, LOGO_FORMAT_ERROR, LOGO_SIZE_ERROR, logoExtensionOf, type LogoFileResult } from './qrLogoFile';
+
+export type { LogoFileResult } from './qrLogoFile';
 
 export function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -32,51 +28,23 @@ export async function loadQrLogoSvg(): Promise<string> {
   return response.text();
 }
 
-export type LogoFileResult =
-  | { ok: true; source: LogoSource; extension: 'svg' | 'png' | 'jpg' }
-  | { ok: false; error: string };
-
 /**
  * Logo importé pour le QR (SVG, PNG ou JPEG, 512 Kio au plus). Lu par arrayBuffer(), jamais
  * par fetch(blob:) (la CSP connect-src ne l'autorise pas). L'extension et les octets doivent
- * concorder ; un SVG passe par le même filtre que le logo intégré.
+ * concorder ; un SVG passe par le même filtre que le logo intégré (checkLogoBytes, partagé
+ * avec le serveur).
  */
 export async function readLogoFile(file: Blob, name: string): Promise<LogoFileResult> {
-  const ext = /\.([a-z0-9]+)$/i.exec(name.trim())?.[1]?.toLowerCase();
-  const extension = ext === 'jpeg' ? 'jpg' : ext;
-  if (extension !== 'svg' && extension !== 'png' && extension !== 'jpg') {
-    return { ok: false, error: 'Format refusé : SVG, PNG ou JPEG attendu.' };
-  }
+  if (!logoExtensionOf(name)) return { ok: false, error: LOGO_FORMAT_ERROR };
   if (file.size === 0) return { ok: false, error: 'Fichier vide.' };
-  if (file.size > MAX_LOGO_BYTES) return { ok: false, error: 'Logo trop lourd : 512 Kio au plus.' };
+  if (file.size > MAX_LOGO_BYTES) return { ok: false, error: LOGO_SIZE_ERROR };
   let bytes: Uint8Array;
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
   } catch {
     return { ok: false, error: 'Lecture du fichier impossible.' };
   }
-  const detected = rasterMimeOf(bytes);
-  if (extension === 'svg') {
-    if (detected) return { ok: false, error: 'Le contenu du fichier ne correspond pas à son extension.' };
-    let markup: string;
-    try {
-      markup = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-    } catch {
-      return { ok: false, error: 'Logo SVG refusé : texte illisible (UTF-8 attendu).' };
-    }
-    try {
-      sanitizeLogoSvg(markup);
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : 'Logo SVG refusé.' };
-    }
-    return { ok: true, source: { kind: 'svg', markup }, extension };
-  }
-  const mime = extension === 'png' ? 'image/png' : 'image/jpeg';
-  if (detected !== mime) return { ok: false, error: 'Le contenu du fichier ne correspond pas à son extension.' };
-  const base64 = bytesToBase64(bytes);
-  const error = rasterLogoError(mime, base64);
-  if (error) return { ok: false, error };
-  return { ok: true, source: { kind: 'raster', mime, base64 }, extension };
+  return checkLogoBytes(bytes, name);
 }
 
 /** Rend le SVG (autonome, sans ressource externe) en PNG carré de `pixels` px. */

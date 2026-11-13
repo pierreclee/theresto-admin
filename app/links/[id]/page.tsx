@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, Pencil } from 'lucide-react';
 import { useSetShortLinkActive, useShortLink } from '@/lib/hooks/useShortLinks';
 import { ShortLinkFormModal } from '@/components/links/ShortLinkFormModal';
-import { QrGenerator } from '@/components/links/QrGenerator';
+import { QrGenerator, qrStyleKey } from '@/components/links/QrGenerator';
 import { LinkStatsPanel } from '@/components/links/LinkStatsPanels';
 import { Loading } from '@/components/shared/Loading';
 import { actionErrorMessage } from '@/lib/api/actionResult';
@@ -86,8 +86,9 @@ export default function ShortLinkDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       <QrGenerator
+        key={qrStyleKey(link.qrStyle)}
+        link={link}
         domain={domain}
-        slug={link.slug}
         defaultTitle={link.kind === 'download' ? "Téléchargez l'app TheResto" : 'TheResto'}
       />
       <LinkStatsPanel linkId={link.id} />
