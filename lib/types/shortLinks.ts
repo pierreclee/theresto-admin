@@ -1,5 +1,6 @@
 import type { ShortLinkForwardParams, ShortLinkKind, ShortLinkPersona } from '@/lib/links/shortLinkRules';
 import type { LinkStats, LinksOverview, StatsPeriod } from '@/lib/links/linkStats';
+import type { QrStyle } from '@/lib/links/qrStyle';
 
 /** Lien court (public.short_links), tel qu'affiché par l'admin. */
 export interface ShortLink {
@@ -19,6 +20,8 @@ export interface ShortLink {
   acceptsQueryAttributes: boolean;
   active: boolean;
   expiresAt: string | null;
+  /** Style enregistré du QR (short_links.qr_style) ; null = style par défaut (DEFAULT_QR_STYLE). */
+  qrStyle: QrStyle | null;
   createdAt: string;
   updatedAt: string;
 }

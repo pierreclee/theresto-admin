@@ -53,6 +53,7 @@ const EXEMPT: Record<string, string> = {
   getShortLinkStatsAction: 'agrégats de link_visit_daily (jour, plateforme, pays), aucune donnée personnelle',
   getShortLinksOverviewAction: 'agrégats de link_visit_daily groupés par persona, ville, campagne',
   exportShortLinkStatsCsvAction: 'CSV des agrégats de link_visit_daily, aucune donnée personnelle',
+  readQrLogoAction: 'logo importé d’un QR (bucket qr-logos), aucune donnée personnelle',
   // subscriptionPrices.ts
   getSubscriptionPricesAction: 'prix Stripe des abonnements, non personnels',
   updateSubscriptionPriceAction: 'journalisée par l Edge Function subscription-prices',

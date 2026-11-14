@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ChevronLeft, Pencil } from 'lucide-react';
 import { useSetShortLinkActive, useShortLink } from '@/lib/hooks/useShortLinks';
 import { ShortLinkFormModal } from '@/components/links/ShortLinkFormModal';
-import { QrGenerator } from '@/components/links/QrGenerator';
+import { QrGenerator, qrStyleKey } from '@/components/links/QrGenerator';
 import { LinkStatsPanel } from '@/components/links/LinkStatsPanels';
 import { Loading } from '@/components/shared/Loading';
 import { actionErrorMessage } from '@/lib/api/actionResult';
@@ -16,6 +16,8 @@ export default function ShortLinkDetailPage({ params }: { params: Promise<{ id: 
   const { data, isPending, error } = useShortLink(id);
   const setActive = useSetShortLinkActive();
   const [editing, setEditing] = useState(false);
+  // Titre du PDF gardé ici : QrGenerator est remonté à chaque style enregistré (key).
+  const [qrTitle, setQrTitle] = useState<string | null>(null);
 
   if (isPending) return <Loading />;
   if (error || !data) {
@@ -26,6 +28,7 @@ export default function ShortLinkDetailPage({ params }: { params: Promise<{ id: 
     );
   }
   const { link, domain } = data;
+  const defaultQrTitle = link.kind === 'download' ? "Téléchargez l'app TheResto" : 'TheResto';
   const targets: [string, string | null][] = [
     ['Par défaut', link.targetDefault],
     ['iPhone', link.targetIos ?? (link.kind === 'download' ? 'App Store (réglages), sinon par défaut' : null)],
@@ -86,9 +89,12 @@ export default function ShortLinkDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       <QrGenerator
+        key={qrStyleKey(link.qrStyle)}
+        link={link}
         domain={domain}
-        slug={link.slug}
-        defaultTitle={link.kind === 'download' ? "Téléchargez l'app TheResto" : 'TheResto'}
+        defaultTitle={defaultQrTitle}
+        title={qrTitle ?? defaultQrTitle}
+        onTitleChange={setQrTitle}
       />
       <LinkStatsPanel linkId={link.id} />
 

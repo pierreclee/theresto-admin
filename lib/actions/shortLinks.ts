@@ -45,6 +45,9 @@ import {
   type LinkVisitRow,
   type StatsPeriod,
 } from '@/lib/links/linkStats';
+import { parseQrStyle, type QrStyle } from '@/lib/links/qrStyle';
+import { checkLogoBytes, cleanedSvgFile, LOGO_CONTENT_TYPES, logoExtensionOf, LOGO_SIZE_ERROR } from '@/lib/links/qrLogoFile';
+import { checkQrColors, MAX_LOGO_BYTES, type LogoSource } from '@/lib/links/qrCode';
 import type {
   ShortLink,
   ShortLinkDetail,
@@ -55,7 +58,7 @@ import type {
 } from '@/lib/types/shortLinks';
 
 // Une seule chaîne littérale : supabase-js en déduit le type des lignes.
-const LINK_COLUMNS = 'id, slug, label, kind, target_default, target_ios, target_android, forward_params, src, ville, persona, campaign, accepts_query_attributes, active, expires_at, created_at, updated_at';
+const LINK_COLUMNS = 'id, slug, label, kind, target_default, target_ios, target_android, forward_params, src, ville, persona, campaign, accepts_query_attributes, active, expires_at, qr_style, created_at, updated_at';
 const SETTINGS_COLUMNS = 'app_store_url, play_store_url, app_store_provider_token, updated_at, updated_by';
 const SETTINGS_TARGET_ID = 'short_link_settings';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -68,6 +71,8 @@ type ShortLinkRow = ShortLinkColumns & {
   /** Lecture seule : vrai seulement pour « telecharger » (contrainte de la base), jamais écrit ici. */
   accepts_query_attributes: boolean;
   active: boolean;
+  /** jsonb validé par la base (short_link_qr_style_valid) ; relu par parseQrStyle. */
+  qr_style: unknown;
   created_at: string;
   updated_at: string;
 };
@@ -92,6 +97,7 @@ function toShortLink(row: ShortLinkRow): ShortLink {
     acceptsQueryAttributes: row.accepts_query_attributes === true,
     active: row.active,
     expiresAt: row.expires_at,
+    qrStyle: parseQrStyle(row.qr_style),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -114,6 +120,61 @@ function dbFailure(error: DbError): { ok: false; code: string; error: string } {
 const invalid = (error: string) => ({ ok: false as const, code: 'invalid-argument', error });
 const conflict = () => ({ ok: false as const, code: 'conflict', error: SHORT_LINK_CONFLICT_MESSAGE });
 const notFound = () => ({ ok: false as const, code: 'not-found', error: 'Lien introuvable.' });
+
+/** Bucket privé des logos importés (clé service seulement, aucune policy). */
+const QR_LOGO_BUCKET = 'qr-logos';
+/** Même règle que la base : <uuid en minuscules>.(svg|png|jpg), à la racine du bucket. */
+const QR_LOGO_PATH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(svg|png|jpg)$/;
+const logoPathOf = (style: QrStyle | null) => (style?.logo === 'custom' ? style.logoPath : null);
+
+/**
+ * Lien pour lequel un fichier de qr-logos a été déposé (métadonnée `link_id` posée par
+ * uploadQrLogoAction). 'missing' : fichier absent ; null : vérification impossible.
+ */
+async function qrLogoOwner(db: Db, path: string): Promise<string | 'missing' | null> {
+  try {
+    const { data, error } = await db.storage.from(QR_LOGO_BUCKET).info(path);
+    if (error || !data) {
+      const status = Number((error as { status?: number; statusCode?: string | number } | null)?.status
+        ?? (error as { statusCode?: string | number } | null)?.statusCode);
+      return status === 400 || status === 404 ? 'missing' : null;
+    }
+    // info() passe les clés en camelCase (link_id → linkId) ; la métadonnée de l'utilisateur
+    // arrive dans `metadata` (ou `userMetadata` selon la version de l'API de Storage).
+    const info = data as { metadata?: Record<string, unknown> | null; userMetadata?: Record<string, unknown> | null };
+    for (const meta of [info.metadata, info.userMetadata]) {
+      const owner = meta?.linkId ?? meta?.link_id;
+      if (typeof owner === 'string') return owner.toLowerCase();
+    }
+    return '';
+  } catch {
+    return null;
+  }
+}
+
+/** Nombre de liens dont le style cite ce fichier (hors `exceptId`), ou null en cas d'erreur. */
+async function qrLogoReferences(db: Db, path: string, exceptId?: string): Promise<number | null> {
+  let query = db.from('short_links').select('id').eq('qr_style->>logoPath', path);
+  if (exceptId) query = query.neq('id', exceptId);
+  const { data, error } = await query;
+  if (error) return null;
+  return (data ?? []).length;
+}
+
+/** Suppression d'un logo plus cité par aucun lien ; best effort, jamais d'exception. */
+async function removeUnusedQrLogo(db: Db, path: string): Promise<void> {
+  try {
+    const references = await qrLogoReferences(db, path);
+    if (references !== 0) {
+      if (references === null) console.error('[liens] ancien logo de QR gardé : vérification impossible');
+      return;
+    }
+    const { error } = await db.storage.from(QR_LOGO_BUCKET).remove([path]);
+    if (error) console.error('[liens] ancien logo de QR non supprimé :', path);
+  } catch {
+    console.error('[liens] ancien logo de QR non supprimé :', path);
+  }
+}
 
 async function readLinkRow(db: Db, id: string): Promise<{ row: ShortLinkRow | null; error: DbError }> {
   const { data, error } = await db.from('short_links').select(LINK_COLUMNS).eq('id', id).maybeSingle();
@@ -393,4 +454,161 @@ export async function updateShortLinkSettingsAction(
     return adminLogRefusal(ADMIN_LOG_WRITE_FAILED_MESSAGE);
   }
   return { ok: true, data: toSettings(updated) };
+}
+
+// ─── Style du QR et logos importés ──────────────────────────────────────────
+//
+// Style : short_links.qr_style (jsonb, NULL = style par défaut), validé ici par parseQrStyle
+// (mêmes règles que short_link_qr_style_valid, la base fait foi). Logos importés : bucket privé
+// qr-logos, clé service seulement ; le navigateur ne reçoit jamais d'URL signée, le logo
+// transite par readQrLogoAction (contenu revérifié), d'où aucune ouverture de la CSP.
+//
+// L'écran n'envoie le fichier qu'au moment d'enregistrer le style (uploadQrLogoAction, puis
+// saveShortLinkQrStyleAction) et retire par discardQrLogoAction un fichier envoyé dont le style
+// n'a pas pu être enregistré (conflit, refus). Chaque fichier porte la métadonnée `link_id`
+// du lien pour lequel il a été déposé : un style ne cite que le logo déjà enregistré pour ce
+// lien ou un fichier déposé pour lui. Un SVG est déposé tel que le filtre l'a resérialisé :
+// le bucket ne contient que des SVG nettoyés. Un fichier peut malgré tout rester sans lien
+// (fenêtre fermée entre les deux appels, suppression en échec) : sans conséquence (pas une
+// donnée personnelle, jamais servi), il peut être supprimé plus tard.
+
+/** Enregistre le style du QR d'un lien (concurrence par updated_at, journal, annulation sans journal). */
+export async function saveShortLinkQrStyleAction(
+  id: string,
+  style: unknown,
+  expectedUpdatedAt: string,
+): Promise<ActionResult<ShortLink>> {
+  const admin = await requireAdmin();
+  if (typeof id !== 'string' || !UUID.test(id)) return notFound();
+  const parsed = parseQrStyle(style);
+  if (!parsed) return invalid('Style du QR refusé : formes, couleurs ou logo invalides.');
+  // Même règle que l'écran et le moteur : modules foncés sur fond clair, contraste 4:1.
+  const colors = checkQrColors(parsed.fg, parsed.bg);
+  if (!colors.ok) return invalid(`Style du QR refusé : ${colors.error}`);
+  const db = await getAdminClient();
+  const nextPath = logoPathOf(parsed);
+  if (nextPath) {
+    // Seul un logo déjà enregistré pour ce lien, ou déposé pour lui, peut être cité : jamais
+    // le fichier d'un autre lien (sa suppression ultérieure ne doit dépendre que de lui).
+    if (typeof expectedUpdatedAt !== 'string' || !expectedUpdatedAt) return conflict();
+    const { row, error: readError } = await readLinkRow(db, id);
+    if (readError) return dbFailure(readError);
+    if (!row) return notFound();
+    if (new Date(row.updated_at).getTime() !== new Date(expectedUpdatedAt).getTime()) return conflict();
+    const owner = await qrLogoOwner(db, nextPath);
+    if (owner === null) return { ok: false, code: 'unavailable', error: 'Vérification du logo impossible. Réessayez.' };
+    if (owner === 'missing') return invalid('Logo introuvable : importez-le de nouveau.');
+    if (nextPath !== logoPathOf(parseQrStyle(row.qr_style)) && owner !== id.toLowerCase()) {
+      return invalid("Logo refusé : il n'a pas été importé pour ce lien. Importez-le de nouveau.");
+    }
+  }
+  let previousPath = null as string | null;
+  const log = (entry: AdminLogEntry) => logAdminAction(admin, entry);
+  const result = await guardedLinkUpdate(log, id, expectedUpdatedAt, (current) => {
+    previousPath = logoPathOf(parseQrStyle(current.qr_style));
+    return { qr_style: parsed };
+  }, (_current, updated, fields) => ({
+    action: 'update_short_link_qr_style',
+    details: { slug: updated.slug, fields },
+  }));
+  if (result.ok && previousPath && previousPath !== nextPath) await removeUnusedQrLogo(db, previousPath);
+  return result;
+}
+
+/**
+ * Dépose un logo importé (SVG, PNG ou JPEG, 512 Kio au plus) dans qr-logos sous un nom tiré
+ * ici (uuid + extension), sans jamais remplacer un fichier. FormData : `linkId`, `file`.
+ * Renvoie le chemin à mettre dans le style ; rien n'est cité tant que le style n'est pas enregistré.
+ */
+export async function uploadQrLogoAction(formData: FormData): Promise<ActionResult<{ logoPath: string }>> {
+  const admin = await requireAdmin();
+  const linkId = formData?.get?.('linkId');
+  const file = formData?.get?.('file');
+  if (typeof linkId !== 'string' || !UUID.test(linkId)) return notFound();
+  if (!file || typeof file !== 'object' || typeof (file as Blob).arrayBuffer !== 'function') {
+    return invalid('Aucun fichier reçu.');
+  }
+  const blob = file as File;
+  const name = typeof blob.name === 'string' ? blob.name : '';
+  const extension = logoExtensionOf(name);
+  if (blob.size > MAX_LOGO_BYTES) return invalid(LOGO_SIZE_ERROR);
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const checked = checkLogoBytes(bytes, name);
+  if (!checked.ok || !extension) return invalid(checked.ok ? 'Format refusé : SVG, PNG ou JPEG attendu.' : checked.error);
+  // SVG : on dépose la version resérialisée par le filtre, jamais l'original ; elle repasse
+  // le même contrôle (taille comprise) que tout fichier relu du bucket.
+  let stored = bytes;
+  if (checked.source.kind === 'svg') {
+    try {
+      stored = new TextEncoder().encode(cleanedSvgFile(checked.source.markup));
+    } catch (e) {
+      return invalid(e instanceof Error ? e.message : 'Logo SVG refusé.');
+    }
+    const recheck = checkLogoBytes(stored, name);
+    if (!recheck.ok) return invalid(recheck.error);
+  }
+
+  const db = await getAdminClient();
+  const { row, error: readError } = await readLinkRow(db, linkId);
+  if (readError) return dbFailure(readError);
+  if (!row) return notFound();
+
+  const path = `${crypto.randomUUID().toLowerCase()}.${extension}`;
+  const { error: uploadError } = await db.storage.from(QR_LOGO_BUCKET)
+    .upload(path, stored, { contentType: LOGO_CONTENT_TYPES[extension], upsert: false, metadata: { link_id: linkId.toLowerCase() } });
+  if (uploadError) {
+    console.error('[liens] logo de QR non déposé');
+    return { ok: false, code: 'storage', error: "Envoi du logo impossible. Réessayez." };
+  }
+
+  const logged = await logAdminAction(admin, {
+    action: 'upload_qr_logo',
+    targetType: 'link',
+    targetId: linkId,
+    // Nom du fichier : un uuid tiré ici, pas une donnée personnelle.
+    details: { slug: row.slug, extension, bytes: stored.length, logoPath: path },
+  });
+  if (!logged) {
+    const { error: removeError } = await db.storage.from(QR_LOGO_BUCKET).remove([path]);
+    if (removeError) console.error('[liens] logo de QR déposé sans journal et non retiré :', path);
+    return adminLogRefusal(ADMIN_LOG_WRITE_FAILED_MESSAGE);
+  }
+  return { ok: true, data: { logoPath: path } };
+}
+
+/** Retire un logo envoyé mais jamais enregistré ; refusé si un lien le cite encore. */
+export async function discardQrLogoAction(linkId: string, logoPath: string): Promise<ActionResult<null>> {
+  const admin = await requireAdmin();
+  if (typeof linkId !== 'string' || !UUID.test(linkId)) return notFound();
+  if (typeof logoPath !== 'string' || !QR_LOGO_PATH.test(logoPath)) return invalid('Chemin de logo refusé.');
+  const db = await getAdminClient();
+  const references = await qrLogoReferences(db, logoPath);
+  if (references === null) return { ok: false, code: 'unavailable', error: 'Vérification du logo impossible. Réessayez.' };
+  if (references > 0) return invalid('Ce logo est utilisé par un lien : il est gardé.');
+  // Journal d'abord : sans journal, le fichier (jamais cité) reste, rien n'est perdu.
+  const logged = await logAdminAction(admin, {
+    action: 'discard_qr_logo',
+    targetType: 'link',
+    targetId: linkId,
+    details: { extension: logoPath.slice(logoPath.lastIndexOf('.') + 1) },
+  });
+  if (!logged) return adminLogRefusal(ADMIN_LOG_WRITE_FAILED_MESSAGE);
+  const { error } = await db.storage.from(QR_LOGO_BUCKET).remove([logoPath]);
+  if (error) {
+    console.error('[liens] logo de QR non retiré :', logoPath);
+    return { ok: false, code: 'storage', error: 'Suppression du logo impossible.' };
+  }
+  return { ok: true, data: null };
+}
+
+/** Contenu d'un logo importé (SVG filtré ou image en base64), revérifié ; jamais d'URL signée. */
+export async function readQrLogoAction(logoPath: string): Promise<ActionResult<LogoSource>> {
+  await requireAdmin();
+  if (typeof logoPath !== 'string' || !QR_LOGO_PATH.test(logoPath)) return invalid('Chemin de logo refusé.');
+  const db = await getAdminClient();
+  const { data, error } = await db.storage.from(QR_LOGO_BUCKET).download(logoPath);
+  if (error || !data) return { ok: false, code: 'not-found', error: 'Logo introuvable dans le stockage.' };
+  const checked = checkLogoBytes(new Uint8Array(await data.arrayBuffer()), logoPath);
+  if (!checked.ok) return { ok: false, code: 'invalid-argument', error: checked.error };
+  return { ok: true, data: checked.source };
 }

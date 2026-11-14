@@ -245,7 +245,24 @@ export function validateShortLinkSettingsInput(raw: unknown): Validation<ShortLi
 
 /** Noms des colonnes dont la valeur change (journal : noms de champs seulement). */
 export function changedFields<T extends object>(before: Partial<T>, after: T): (keyof T & string)[] {
-  return (Object.keys(after) as (keyof T & string)[]).filter((key) => (before[key] ?? null) !== (after[key] ?? null));
+  return (Object.keys(after) as (keyof T & string)[]).filter((key) => !sameValue(before[key] ?? null, after[key] ?? null));
+}
+
+/** JSON à clés triées : un jsonb relu (clés dans l'ordre de PostgreSQL) se compare à l'objet saisi. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (value && typeof value === 'object') {
+    const o = value as Record<string, unknown>;
+    return `{${Object.keys(o).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson(o[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value) ?? 'null';
+}
+
+/** Égalité des valeurs simples, et des objets (jsonb, comme qr_style) par leur contenu. */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) return false;
+  return canonicalJson(a) === canonicalJson(b);
 }
 
 // ─── Domaine ────────────────────────────────────────────────────────────────
