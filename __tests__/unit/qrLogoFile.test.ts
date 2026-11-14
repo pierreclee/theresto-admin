@@ -51,12 +51,12 @@ describe('readLogoFile', () => {
     const max = new Uint8Array(MAX_LOGO_BYTES);
     max.set(PNG.subarray(0, 8));
     expect((await readLogoFile(blob(max), 'logo.png')).ok).toBe(true);
-    const script = await readLogoFile(blob('<svg viewBox="0 0 1 1"><script>alert(1)</script></svg>'), 'logo.svg');
+    const script = await readLogoFile(blob('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><script>alert(1)</script></svg>'), 'logo.svg');
     expect(script.ok).toBe(false);
     expect(!script.ok && script.error).toMatch(/^Logo SVG refusé/);
-    const external = await readLogoFile(blob('<svg viewBox="0 0 1 1"><image href="https://x/y.png"/></svg>'), 'logo.svg');
+    const external = await readLogoFile(blob('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><image href="https://x/y.png"/></svg>'), 'logo.svg');
     expect(external.ok).toBe(false);
-    const noViewBox = await readLogoFile(blob('<svg width="1" height="1"></svg>'), 'logo.svg');
+    const noViewBox = await readLogoFile(blob('<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"></svg>'), 'logo.svg');
     expect(!noViewBox.ok && noViewBox.error).toMatch(/viewBox/);
     const latin1 = await readLogoFile(blob(new Uint8Array([0x3c, 0x73, 0x76, 0x67, 0xe9, 0x3e])), 'logo.svg');
     expect(!latin1.ok && latin1.error).toMatch(/UTF-8/);

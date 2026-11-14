@@ -12,7 +12,8 @@
  *     alors parfois un faux motif pris dans les données. Ces cas sont décodés et comptés, et
  *     jsQR ne doit jamais lire une autre URL que la bonne.
  * Cas : toutes les formes de modules × cadres × points de repère avec le logo TheResto, puis
- * sans logo, avec un logo PNG importé, en couleurs, avec une URL courte et une longue (slug
+ * sans logo, avec un logo PNG importé, avec un logo SVG qui déborde de son viewBox (découpé
+ * au disque), en couleurs, avec une URL courte et une longue (slug
  * de 40 caractères sur le domaine de staging), et en petite impression (4 px par module).
  */
 import fs from 'fs';
@@ -39,6 +40,13 @@ function testPng(): Uint8Array {
     + '<rect width="64" height="48" rx="8" fill="url(#g)"/><circle cx="32" cy="24" r="14" fill="#FFF8F0"/></svg>';
   return new Uint8Array(new Resvg(svg).render().asPng());
 }
+/** Logo importé qui déborde largement de son viewBox : sans la découpe au disque, il noircirait tout le code. */
+const OVERFLOW: LogoSource = {
+  kind: 'svg',
+  markup: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">'
+    + '<rect x="-1000" y="-1000" width="3000" height="3000" fill="#000"/>'
+    + '<circle cx="50" cy="50" r="40" fill="#FF6B35"/></svg>',
+};
 const RASTER: LogoSource = { kind: 'raster', mime: 'image/png', base64: bytesToBase64(testPng()) };
 
 interface Case {
@@ -118,6 +126,11 @@ describe('lisibilité : variantes', () => {
   it.each(QR_MODULE_SHAPES)('logo PNG importé, modules %s', (modules) => {
     check({ url: URL_PROD, modules, eyeFrame: 'leaf', eyeDot: 'leaf', logo: RASTER });
     check({ url: URL_PROD, modules, eyeFrame: 'square', eyeDot: 'circle', logo: RASTER });
+  });
+
+  it.each(QR_MODULE_SHAPES)('logo SVG qui déborde de son viewBox, découpé au disque, modules %s', (modules) => {
+    check({ url: URL_PROD, modules, eyeFrame: 'square', eyeDot: 'square', logo: OVERFLOW });
+    check({ url: URL_LONG, modules, eyeFrame: 'rounded', eyeDot: 'rounded', logo: OVERFLOW });
   });
 
   it.each(QR_MODULE_SHAPES)('#1F3A5F sur #FFF8F0, modules %s', (modules) => {

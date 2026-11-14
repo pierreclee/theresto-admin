@@ -2,7 +2,7 @@
 // partagée par le navigateur (readLogoFile, lib/links/browserFiles.ts) et le serveur
 // (uploadQrLogoAction, readQrLogoAction de lib/actions/shortLinks.ts) : mêmes règles des deux
 // côtés. L'extension et les octets doivent concorder ; un SVG passe par le filtre du moteur
-// (sanitizeLogoSvg), qui ne lit que du texte.
+// (sanitizeLogoSvg : liste blanche après analyse XML, lib/links/svgSanitize.ts).
 
 import {
   bytesToBase64,

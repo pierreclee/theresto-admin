@@ -230,7 +230,7 @@ describe('uploadQrLogoAction', () => {
     expect(ok.ok).toBe(true);
     expect(storage.upload).toHaveBeenCalledWith(expect.stringMatching(/\.svg$/), expect.any(Uint8Array), { contentType: 'image/svg+xml', upsert: false });
     storage.upload.mockClear();
-    const evil = await uploadQrLogoAction(form(new Blob(['<svg viewBox="0 0 1 1"><script>alert(1)</script></svg>']), 'logo.svg'));
+    const evil = await uploadQrLogoAction(form(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><script>alert(1)</script></svg>']), 'logo.svg'));
     expect(evil).toMatchObject({ ok: false, code: 'invalid-argument', error: expect.stringMatching(/^Logo SVG refusé/) });
     expect(storage.upload).not.toHaveBeenCalled();
   });
@@ -306,7 +306,7 @@ describe('readQrLogoAction', () => {
   );
 
   it('contenu du bucket refusé par le filtre : erreur, rien renvoyé', async () => {
-    storage.download.mockResolvedValue({ data: new Blob(['<svg viewBox="0 0 1 1"><script/></svg>']), error: null });
+    storage.download.mockResolvedValue({ data: new Blob(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><script/></svg>']), error: null });
     await expect(readQrLogoAction(NEW_LOGO)).resolves.toMatchObject({ ok: false, error: expect.stringMatching(/^Logo SVG refusé/) });
   });
 

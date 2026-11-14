@@ -31,6 +31,7 @@ import { QR_EYE_SHAPES, QR_MODULE_SHAPES } from '@/lib/links/qrStyle';
 import { A5_SIZE, buildQrPdf, encodableText } from '@/lib/links/qrPdf';
 import { shortLinkUrl } from '@/lib/links/shortLinkRules';
 
+const SVG_NS = 'xmlns="http://www.w3.org/2000/svg"';
 const LOGO = fs.readFileSync(path.resolve(__dirname, '../../public/qr-logo.svg'), 'utf8');
 const URL_PROD = shortLinkUrl('go.theresto.fr', 'telecharger');
 const STAGING = 'theresto-go-staging.pierrecleepro.workers.dev';
@@ -221,6 +222,30 @@ describe('SVG', () => {
     expect(svg).toContain(disk);
     expect(svg.slice(0, svg.indexOf('<g transform='))).not.toContain('#FFFFFF');
     expect(svg.indexOf(disk)).toBeLessThan(svg.indexOf('<g transform='));
+    // Logo découpé au disque : clipPath du même cercle, enveloppant le logo.
+    const clip = /<clipPath id="(qr-logo-clip-\d+)"><circle cx="([\d.]+)" cy="([\d.]+)" r="([\d.]+)"\/><\/clipPath>/.exec(svg);
+    expect(clip).not.toBeNull();
+    expect(clip!.slice(2)).toEqual([round(center + q), round(center + q), round(radius)]);
+    expect(svg).toContain(`<g clip-path="url(#${clip![1]})"><g transform=`);
+  });
+
+  it('découpe au disque : ids uniques d un QR à l autre, logo PNG compris', () => {
+    const m = buildQrMatrix(URL_PROD, { withLogo: true });
+    const ids = [
+      qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logo: { kind: 'svg', markup: LOGO } }),
+      qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logo: { kind: 'raster', mime: 'image/png', base64: PNG_1PX_B64 } }),
+    ].map((svg) => {
+      const id = /<g clip-path="url\(#(qr-logo-clip-\d+)\)">/.exec(svg)?.[1];
+      expect(svg).toContain(`<clipPath id="${id}">`);
+      return id;
+    });
+    expect(ids[0]).not.toBe(ids[1]);
+    // Ids du logo préfixés : deux QR dans une même page ne se volent pas leurs dégradés.
+    const grad = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><linearGradient id="g"/><rect fill="url(#g)"/></svg>`;
+    const a = placeLogoSvg(grad, 0, 0, 1);
+    const b = placeLogoSvg(grad, 0, 0, 1);
+    expect(a).toMatch(/id="lg-\d+-g".*fill="url\(#lg-\d+-g\)"/);
+    expect(a).not.toBe(b);
   });
 
   it('logo PNG embarqué : <image> data: centré, proportions gardées, seul href', () => {
@@ -239,11 +264,11 @@ describe('SVG', () => {
   });
 
   it('logo non carré ou décalé : centré dans sa zone, viewBox compensé', () => {
-    const g = placeLogoSvg('<svg viewBox="10 20 200 100"><rect width="1" height="1"/></svg>', 5, 5, 10);
+    const g = placeLogoSvg(`<svg ${SVG_NS} viewBox="10 20 200 100"><rect width="1" height="1"/></svg>`, 5, 5, 10);
     // échelle 10/200 = 0.05 ; hauteur 5 centrée (+2.5) ; origine du viewBox ramenée à 0.
     expect(g).toBe('<g transform="translate(4.5 6.5) scale(0.05)"><rect width="1" height="1"/></g>');
-    expect(() => placeLogoSvg('<svg width="10" height="10"></svg>', 0, 0, 1)).toThrow();
-    expect(() => placeLogoSvg('<svg viewBox="0 0 1 1"><svg/></svg>', 0, 0, 1)).toThrow();
+    expect(() => placeLogoSvg(`<svg ${SVG_NS} width="10" height="10"></svg>`, 0, 0, 1)).toThrow();
+    expect(() => placeLogoSvg(`<svg ${SVG_NS} viewBox="0 0 1 1"><svg/></svg>`, 0, 0, 1)).toThrow();
   });
 
   it('couleurs refusées : pas de SVG', () => {
@@ -254,23 +279,25 @@ describe('SVG', () => {
 
   it('logo SVG qui chargerait ou exécuterait quelque chose : refusé', () => {
     const refused = [
-      '<svg viewBox="0 0 1 1"><script>alert(1)</script></svg>',
-      '<svg viewBox="0 0 1 1"><image href="https://x/y.png"/></svg>',
-      '<svg viewBox="0 0 1 1"><image xlink:href="http://x/y.png"/></svg>',
-      '<svg viewBox="0 0 1 1"><a href = "javascript:alert(1)"><rect/></a></svg>',
-      '<svg viewBox="0 0 1 1"><rect fill="javascript:x"/></svg>',
-      '<svg viewBox="0 0 1 1" onload="x()"></svg>',
-      '<svg viewBox="0 0 1 1"><rect onclick = "x()"/></svg>',
-      '<svg viewBox="0 0 1 1"><foreignObject/></svg>',
-      '<svg viewBox="0 0 1 1"><use href="#a"/></svg>',
-      '<svg viewBox="0 0 1 1"><set attributeName="fill" to="red"/></svg>',
-      '<svg viewBox="0 0 1 1"><style>@import "https://x/y.css";</style></svg>',
-      '<svg viewBox="0 0 1 1"><rect style="fill:url(https://x/y)"/></svg>',
-      '<!DOCTYPE svg [<!ENTITY a "b">]><svg viewBox="0 0 1 1"></svg>',
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><script>alert(1)</script></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><image href="https://x/y.png"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><image xmlns:xlink="http://www.w3.org/1999/xlink" xlink:href="http://x/y.png"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><a href = "javascript:alert(1)"><rect/></a></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><rect fill="javascript:x"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1" onload="x()"></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><rect onclick = "x()"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><foreignObject/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><use href="#a"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><set attributeName="fill" to="red"/></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><style>@import "https://x/y.css";</style></svg>`,
+      `<svg ${SVG_NS} viewBox="0 0 1 1"><rect style="fill:url(https://x/y)"/></svg>`,
+      `<!DOCTYPE svg [<!ENTITY a "b">]><svg ${SVG_NS} viewBox="0 0 1 1"></svg>`,
+      '<svg viewBox="0 0 1 1"><rect/></svg>',
     ];
     for (const svg of refused) expect(() => sanitizeLogoSvg(svg)).toThrow(/refusé/);
     // Références internes et styles permis (logos exportés par les logiciels de dessin).
-    const ok = '﻿<?xml version="1.0"?><!-- logo --><svg viewBox="0 0 2 2"><defs><linearGradient id="g"/></defs>'
+    const ok = `﻿<?xml version="1.0"?><!-- logo --><svg ${SVG_NS} viewBox="0 0 2 2"><defs>`
+      + '<linearGradient id="g"/></defs>'
       + '<style>.a{fill:url(#g)}</style><rect class="a" fill="url( #g)" width="2" height="2"/></svg>';
     expect(sanitizeLogoSvg(ok).viewBox).toEqual([0, 0, 2, 2]);
     expect(placeLogoSvg(LOGO, 1, 2, 3)).toMatch(/^<g transform="translate\(1 2\) scale\(0\.03\)">/);

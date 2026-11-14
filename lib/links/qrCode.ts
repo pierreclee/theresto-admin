@@ -29,9 +29,12 @@
 //     au plus 20 % des modules du code ; sinon R diminue d'un quart de module jusqu'à y être.
 //   - Le logo est inscrit dans un carré centré de côté 1,06·R (ses coins à 75 % du rayon) :
 //     marge d'au moins 0,47·R entre le logo et les modules, contre un demi-module avant.
+//   - Le logo (SVG ou image) est découpé au disque (clipPath) : un logo importé qui
+//     déborderait de son viewBox ne peut pas recouvrir les modules.
 
 import { create } from 'qrcode';
 import type { QrEyeShape, QrModuleShape } from './qrStyle';
+import { sanitizeSvgLogo } from './svgSanitize';
 
 export const QUIET_ZONE_MODULES = 4;
 /** Part maximale des modules du code effacés sous le logo. */
@@ -212,39 +215,22 @@ export function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Filtre d'un logo SVG (intégré ou importé) : refuse tout ce qui chargerait ou exécuterait
- * quelque chose (script, href, gestionnaire on…, url() hors référence interne, entités,
- * animation…). Renvoie le contenu de la racine et son viewBox, ou lève une erreur en français.
+ * Filtre d'un logo SVG (intégré ou importé) : liste blanche après analyse XML
+ * (lib/links/svgSanitize.ts). Renvoie le contenu de la racine, ids préfixés par `idPrefix`, et
+ * son viewBox, ou lève une erreur en français.
  */
-export function sanitizeLogoSvg(logoSvg: string): { inner: string; viewBox: [number, number, number, number] } {
-  const svg = logoSvg
-    .replace(/^﻿/, '')
-    .replace(/<\?xml[^>]*\?>/i, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .trim();
-  const forbidden = [
-    /<(?:script|foreignObject|iframe|embed|object|audio|video|image|use|set|animate\w*|a)\b/i,
-    /\bhref\s*=/i,
-    /\son[a-z]+\s*=/i,
-    /javascript:/i,
-    /<!(?:DOCTYPE|ENTITY)/i,
-    /@import/i,
-    /url\((?!\s*['"]?\s*#)/i,
-  ];
-  if (!svg.startsWith('<svg') || forbidden.some((re) => re.test(svg))) {
-    throw new Error('Logo SVG refusé : il contient un script, un lien ou une ressource externe.');
-  }
-  const open = /^<svg\b([^>]*)>/i.exec(svg);
-  const closeAt = svg.lastIndexOf('</svg>');
-  if (!open || closeAt < open[0].length) throw new Error('Logo SVG refusé : fichier mal formé.');
-  const inner = svg.slice(open[0].length, closeAt).trim();
-  if (/<svg\b/i.test(inner)) throw new Error('Logo SVG refusé : SVG imbriqué.');
-  const viewBox = /\sviewBox="([^"]*)"/i.exec(open[1]);
-  const box = viewBox ? viewBox[1].trim().split(/[\s,]+/).map(Number) : [];
-  if (box.length !== 4 || box.some((v) => !Number.isFinite(v)) || box[2] <= 0 || box[3] <= 0) {
-    throw new Error('Logo SVG refusé : viewBox attendu');
-  }
-  return { inner, viewBox: box as [number, number, number, number] };
+export function sanitizeLogoSvg(
+  logoSvg: string,
+  idPrefix?: string,
+): { inner: string; viewBox: [number, number, number, number] } {
+  return sanitizeSvgLogo(logoSvg, idPrefix);
+}
+
+/** Numéro unique des ids posés dans un QR (logo, découpe) : plusieurs QR peuvent cohabiter dans une page. */
+let idSequence = 0;
+function nextIdNumber(): number {
+  idSequence += 1;
+  return idSequence;
 }
 
 // ─── SVG ────────────────────────────────────────────────────────────────────
@@ -261,8 +247,14 @@ function fmt(n: number): string {
  * imbriqué et posent alors le logo en haut à gauche, sur un motif de repérage (QR illisible).
  * Mise à l'échelle uniforme et centrée, comme le `xMidYMid meet` par défaut du viewBox.
  */
-export function placeLogoSvg(logoSvg: string, x: number, y: number, side: number): string {
-  const { inner, viewBox: [minX, minY, w, h] } = sanitizeLogoSvg(logoSvg);
+export function placeLogoSvg(
+  logoSvg: string,
+  x: number,
+  y: number,
+  side: number,
+  idPrefix = `lg-${nextIdNumber()}-`,
+): string {
+  const { inner, viewBox: [minX, minY, w, h] } = sanitizeLogoSvg(logoSvg, idPrefix);
   const scale = side / Math.max(w, h);
   const tx = x + (side - w * scale) / 2 - minX * scale;
   const ty = y + (side - h * scale) / 2 - minY * scale;
@@ -477,9 +469,14 @@ export function qrSvg(matrix: QrMatrix, options: QrSvgOptions): string {
     // Disque de la couleur du fond, par-dessus les bords des modules voisins.
     parts.push(`<circle cx="${fmt(c)}" cy="${fmt(c)}" r="${fmt(radius)}" fill="${options.lightColor}"/>`);
     const at = c - side / 2;
-    parts.push(options.logo.kind === 'svg'
-      ? placeLogoSvg(options.logo.markup, at, at, side)
-      : placeLogoRaster(options.logo.mime, options.logo.base64, at, at, side));
+    const n = nextIdNumber();
+    const logo = options.logo.kind === 'svg'
+      ? placeLogoSvg(options.logo.markup, at, at, side, `lg-${n}-`)
+      : placeLogoRaster(options.logo.mime, options.logo.base64, at, at, side);
+    // Logo découpé au disque : quoi qu'il contienne, il ne dessine jamais sur les modules.
+    const clipId = `qr-logo-clip-${n}`;
+    parts.push(`<defs><clipPath id="${clipId}"><circle cx="${fmt(c)}" cy="${fmt(c)}" r="${fmt(radius)}"/></clipPath></defs>`);
+    parts.push(`<g clip-path="url(#${clipId})">${logo}</g>`);
   }
   parts.push('</svg>');
   return parts.join('');
