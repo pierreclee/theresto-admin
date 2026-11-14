@@ -47,6 +47,9 @@ const round = (n: number) => String(Math.round(n * 1e6) / 1e6);
 const q = QUIET_ZONE_MODULES;
 const inFinder = (r: number, c: number, size: number) =>
   (r < 7 && c < 7) || (r < 7 && c >= size - 7) || (r >= size - 7 && c < 7);
+/** Distance du centre du disque au point le plus proche de la case (r, c), carré 1×1. */
+const nearestInCell = (r: number, c: number, center: number) =>
+  Math.hypot(Math.max(c - center, 0, center - c - 1), Math.max(r - center, 0, center - r - 1));
 /** Tracés du QR, dans l'ordre : modules, cadres (repères + alignements), points. */
 const paths = (svg: string) => [...svg.matchAll(/<path ([^>]*)d="([^"]*)"\/>/g)].map((x) => ({ attrs: x[1], d: x[2] }));
 
@@ -94,11 +97,11 @@ describe('matrice', () => {
       expect(m.logo).not.toBeNull();
       const { center, radius, side, erased } = m.logo!;
       expect(center).toBe(m.size / 2);
-      // Modules effacés : exactement ceux dont le centre est dans le disque, comptés un à un.
+      // Modules effacés : exactement ceux dont la case touche le disque, comptés un à un.
       let inDisk = 0;
       for (let r = 0; r < m.size; r += 1) {
         for (let c = 0; c < m.size; c += 1) {
-          if (Math.hypot(c + 0.5 - center, r + 0.5 - center) <= radius) {
+          if (nearestInCell(r, c, center) < radius) {
             inDisk += 1;
             expect(m.dark[r][c]).toBe(false);
           } else {
@@ -109,7 +112,8 @@ describe('matrice', () => {
       expect(erased).toBe(inDisk);
       expect(logoAreaRatio(m)).toBe(erased / (m.size * m.size));
       expect(logoAreaRatio(m)).toBeLessThanOrEqual(MAX_LOGO_AREA);
-      expect(logoAreaRatio(m)).toBeGreaterThan(0.05);
+      // Cases touchées (≈ 10 à 12 %) : plus que les seuls centres dans le disque (≈ 9 %).
+      expect(logoAreaRatio(m)).toBeGreaterThan(0.09);
       // Le disque ne touche ni les carrés de 8×8 des coins (repère + séparateur)…
       for (const [x, y] of [[8, 8], [m.size - 8, 8], [8, m.size - 8]]) {
         expect(Math.hypot(x - center, y - center)).toBeGreaterThan(radius);
@@ -126,6 +130,44 @@ describe('matrice', () => {
       // Motifs de repérage intacts dans la matrice.
       expect(m.dark[0][0]).toBe(true);
     }
+  });
+
+  it('bord du disque : aucun module visible coupé, aucun module effacé hors du disque', () => {
+    // Textes de longueurs variées : codes de 21 à 69 modules de côté.
+    const texts = ['a', 'https://go.theresto.fr/ab', URL_PROD, shortLinkUrl(STAGING, 'a'.repeat(40)),
+      `https://go.theresto.fr/${'b'.repeat(90)}`, `https://go.theresto.fr/${'c'.repeat(150)}`];
+    const sizes = new Set<number>();
+    for (const text of texts) {
+      const m = buildQrMatrix(text, { withLogo: true });
+      const ref = create(text, { errorCorrectionLevel: 'H' }).modules;
+      sizes.add(m.size);
+      const { center, radius } = m.logo!;
+      for (let r = 0; r < m.size; r += 1) {
+        for (let c = 0; c < m.size; c += 1) {
+          const nearest = nearestInCell(r, c, center);
+          // Case foncée de la librairie restée foncée : jamais touchée par le disque.
+          if (ref.get(r, c) && m.dark[r][c]) expect(nearest).toBeGreaterThanOrEqual(radius);
+          // Case effacée (foncée devenue claire) : elle touche le disque.
+          if (ref.get(r, c) && !m.dark[r][c]) expect(nearest).toBeLessThan(radius);
+        }
+      }
+      // Zones protégées jamais effacées : carrés de 8×8 des coins, ligne et colonne de timing.
+      for (let i = 0; i < m.size; i += 1) {
+        expect(m.dark[6][i]).toBe(Boolean(ref.get(6, i)));
+        expect(m.dark[i][6]).toBe(Boolean(ref.get(i, 6)));
+      }
+      for (let r = 0; r < 8; r += 1) {
+        for (let c = 0; c < 8; c += 1) {
+          for (const [rr, cc] of [[r, c], [r, m.size - 1 - c], [m.size - 1 - r, c]]) {
+            expect(m.dark[rr][cc]).toBe(Boolean(ref.get(rr, cc)));
+          }
+        }
+      }
+      expect(logoAreaRatio(m)).toBeLessThanOrEqual(MAX_LOGO_AREA);
+    }
+    expect(Math.min(...sizes)).toBe(21);
+    expect(Math.max(...sizes)).toBeGreaterThanOrEqual(69);
+    expect(sizes.size).toBeGreaterThanOrEqual(5);
   });
 
   it('motifs d alignement : positions de la norme, conformes à la matrice', () => {

@@ -20,9 +20,10 @@
 // repères de même forme) : __tests__/unit/qrReadability.test.ts.
 //
 // Zone du logo : un disque centré sur le code, de rayon R (en modules).
-//   - Un module est effacé si son centre est dans le disque (distance ≤ R) ; le disque, de la
-//     couleur du fond, est dessiné par-dessus, ce qui donne un bord rond net.
-//   - R visé : 17 % du côté du code (≈ 9 % des modules effacés) ; il ne dépasse jamais
+//   - Un module est effacé dès que sa case (carré 1×1) touche le disque : le point de la case
+//     le plus proche du centre est à moins de R. Le disque, de la couleur du fond, ne recouvre
+//     donc que des cases effacées : aucun module visible n'est coupé (pas de demi-point au bord).
+//   - R visé : 17 % du côté du code (≈ 10 à 12 % des modules effacés) ; il ne dépasse jamais
 //     (côté/2 − 7) − 0,5, pour ne toucher ni la ligne ni la colonne de timing (6), ni
 //     √2·(côté/2 − 8) − 0,5, pour ne toucher aucun carré de 8×8 aux coins (repère + séparateur).
 //   - Règle des 20 % : le nombre de modules effacés (clairs ou foncés, comptés un à un) reste
@@ -58,7 +59,7 @@ export interface QrLogoZone {
   radius: number;
   /** Côté du carré où le logo est inscrit, en modules. */
   side: number;
-  /** Nombre de modules effacés (centre dans le disque). */
+  /** Nombre de modules effacés (case qui touche le disque). */
   erased: number;
 }
 
@@ -72,16 +73,21 @@ export interface QrMatrix {
   logo: QrLogoZone | null;
 }
 
-function cellInDisk(r: number, c: number, center: number, radius: number): boolean {
-  const dx = c + 0.5 - center;
-  const dy = r + 0.5 - center;
-  return dx * dx + dy * dy <= radius * radius;
+/**
+ * Vrai si la case (r, c), carré 1×1, touche le disque : le point de la case le plus proche du
+ * centre est à moins de `radius`. Une case qui touche le disque est effacée en entier : aucun
+ * module visible n'est coupé par le disque du fond.
+ */
+export function cellTouchesDisk(r: number, c: number, center: number, radius: number): boolean {
+  const dx = Math.max(c - center, 0, center - (c + 1));
+  const dy = Math.max(r - center, 0, center - (r + 1));
+  return dx * dx + dy * dy < radius * radius;
 }
 
 function countInDisk(size: number, center: number, radius: number): number {
   let n = 0;
   for (let r = 0; r < size; r += 1) {
-    for (let c = 0; c < size; c += 1) if (cellInDisk(r, c, center, radius)) n += 1;
+    for (let c = 0; c < size; c += 1) if (cellTouchesDisk(r, c, center, radius)) n += 1;
   }
   return n;
 }
@@ -112,7 +118,7 @@ export function buildQrMatrix(text: string, options: { withLogo: boolean }): QrM
       erased = countInDisk(size, center, radius);
     }
     for (let r = 0; r < size; r += 1) {
-      for (let c = 0; c < size; c += 1) if (cellInDisk(r, c, center, radius)) dark[r][c] = false;
+      for (let c = 0; c < size; c += 1) if (cellTouchesDisk(r, c, center, radius)) dark[r][c] = false;
     }
     logo = { center, radius, side: radius * LOGO_SIDE_IN_RADIUS, erased };
   }
