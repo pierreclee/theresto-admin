@@ -91,29 +91,37 @@ l'environnement choisi à la connexion, cookie `theresto_env`, est staging). Con
 - **Journal** : chaque écriture écrit une ligne de `platform_logs` avec `target_type = 'link'`
   (`create_short_link`, `update_short_link`, `deactivate_short_link`, `reactivate_short_link`,
   `update_short_link_settings` avec `target_id = 'short_link_settings'`, `update_short_link_qr_style`,
-  `upload_qr_logo` et `discard_qr_logo` : extension et taille du fichier seulement), `details` = slug et noms des
+  `upload_qr_logo` : extension, taille et nom `<uuid>` du fichier ; `discard_qr_logo` : extension), `details` = slug et noms des
   champs modifiés seulement (jamais le libellé ni une URL). Si le journal ne s'écrit pas, l'écriture est
   annulée (valeurs d'avant remises, lien tout juste créé retiré) et l'action refusée (`audit-log-failed`).
 - **QR** : généré dans le navigateur, sans service tiers (`qrcode` et `pdf-lib`, MIT) ; il encode
   toujours `https://<domaine>/<slug>`. Correction H avec le logo (`public/qr-logo.svg`, au plus 20 % de
   la surface, fond blanc), zone de silence de 4 modules, contraste d'au moins 4:1 (fond plus sombre
-  refusé). Exports SVG, PNG 2000 px et PDF A5 (titre saisi, jamais le libellé interne, et URL courte).
+  refusé). Exports SVG, PNG 2000 px et PDF A5 (titre saisi, jamais le libellé interne, et URL courte ;
+  gardé par la page quand le style est enregistré). Logo PNG / JPEG : le SVG l'embarque en `data:` ; le
+  PNG (et le PDF) le décode à part (`decode()`) et le pose sur le canvas, découpé au disque
+  (`qrLogoGeometry`), Safari et Firefox pouvant dessiner un SVG avant l'image qu'il contient.
   La CSP existante suffit (`img-src data: blob:`, téléchargements par URL `blob:`).
 - **Style du QR, enregistré par lien** (`short_links.qr_style`, NULL = style par défaut) : forme des
   petits modules (carrés, arrondis, points, losanges, étoiles), cadre et point des 3 repères des coins
   (carré, arrondi, rond, feuille, réglés séparément ; formes différentes : note de test à l'impression),
   couleurs, logo (aucun, TheResto, fichier importé SVG / PNG / JPEG de 512 Kio au plus). Validé par
   `parseQrStyle` (`lib/links/qrStyle.ts`, mêmes règles que la base) ; enregistré par
-  `saveShortLinkQrStyleAction` (concurrence par `updated_at`, journal, style remis si le journal échoue).
+  `saveShortLinkQrStyleAction` (couleurs revérifiées par `checkQrColors`, concurrence par `updated_at`,
+  journal, style remis si le journal échoue).
   Les exports reprennent le style affiché, enregistré ou non.
 - **Logos importés** : bucket privé `qr-logos` (clé service seulement), fichier `<uuid>.(svg|png|jpg)` à la
   racine. Contrôlé dans le navigateur à l'import (aperçu) puis par le serveur avec la même fonction
-  (`checkLogoBytes`, `lib/links/qrLogoFile.ts` : extension et octets concordants, SVG filtré). Envoyé
-  seulement à « Enregistrer le style » (`uploadQrLogoAction`, `upsert: false`, fichier retiré si le
-  journal échoue) ; retiré si le style n'est pas enregistré (`discardQrLogoAction`, refusé pour un
-  fichier cité par un lien) ; l'ancien logo d'un lien est supprimé quand plus aucun lien ne le cite.
-  Lu par `readQrLogoAction` (contenu revérifié) : jamais d'URL signée dans le navigateur, aucune
-  ouverture de la CSP. Un fichier peut rester sans lien (fenêtre fermée entre l'envoi et
+  (`checkLogoBytes`, `lib/links/qrLogoFile.ts` : extension et octets concordants, SVG filtré). Le bucket
+  ne contient que des SVG nettoyés : un SVG est déposé tel que le filtre l'a resérialisé (racine
+  `<svg xmlns viewBox>` reconstruite, `cleanedSvgFile`), jamais l'original. Envoyé
+  seulement à « Enregistrer le style » (`uploadQrLogoAction`, `upsert: false`, métadonnée `link_id` du
+  lien, fichier retiré si le journal échoue) ; un style ne cite que le logo déjà enregistré pour ce lien
+  ou un fichier déposé pour lui (métadonnée relue par `info()`), jamais celui d'un autre lien ; retiré si
+  le style n'est pas enregistré (`discardQrLogoAction`, refusé pour un fichier cité par un lien) ;
+  l'ancien logo d'un lien est supprimé quand plus aucun lien ne le cite. Lu par `readQrLogoAction`
+  (contenu revérifié). On ne crée jamais d'URL signée sur `qr-logos` (ni pour le navigateur ni
+  ailleurs) : aucune ouverture de la CSP. Un fichier peut rester sans lien (fenêtre fermée entre l'envoi et
   l'enregistrement) : sans conséquence, jamais servi.
 - **Statistiques** : scans par jour (30 / 90 jours), plateformes, pays, part de robots exclus, vue
   d'ensemble par persona, ville et campagne, export CSV. Ce sont des scans, pas des installations

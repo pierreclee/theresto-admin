@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Download, ImageOff, RotateCcw, Save, Upload } from 'lucide-react';
-import { buildQrMatrix, checkQrColors, logoAreaRatio, qrSvg, type LogoSource } from '@/lib/links/qrCode';
+import { buildQrMatrix, checkQrColors, logoAreaRatio, qrLogoGeometry, qrSvg, type LogoSource } from '@/lib/links/qrCode';
 import { downloadBlob, loadQrLogoSvg, readLogoFile, svgToPngBlob } from '@/lib/links/browserFiles';
 import { shortLinkUrl } from '@/lib/links/shortLinkRules';
 import {
@@ -66,13 +66,24 @@ interface ImportedLogo {
  * Logo importé : contrôlé dans le navigateur dès l'import (aperçu immédiat), mais envoyé au
  * bucket seulement à « Enregistrer le style » : un import abandonné ou remplacé ne laisse aucun
  * fichier, et le serveur recontrôle le fichier au moment où il devient le logo du lien.
+ *
+ * Titre du PDF : la page le garde (`title`, `onTitleChange`) quand elle remonte ce composant à
+ * chaque style enregistré (`key={qrStyleKey(...)}`) ; sans ces props, il reste local.
  */
-export function QrGenerator({ link, domain, defaultTitle }: { link: ShortLink; domain: string; defaultTitle: string }) {
+export function QrGenerator({ link, domain, defaultTitle, title: titleProp, onTitleChange }: {
+  link: ShortLink;
+  domain: string;
+  defaultTitle: string;
+  title?: string;
+  onTitleChange?: (title: string) => void;
+}) {
   const toast = useToast();
   const saved = link.qrStyle ?? DEFAULT_QR_STYLE;
   const savedPath = saved.logo === 'custom' ? saved.logoPath : null;
   // Titre imprimé sur le PDF : saisi ici, jamais le libellé interne du lien (jamais publié).
-  const [title, setTitle] = useState(defaultTitle);
+  const [localTitle, setLocalTitle] = useState(defaultTitle);
+  const title = titleProp ?? localTitle;
+  const setTitle = onTitleChange ?? setLocalTitle;
   const [draft, setDraft] = useState<StyleDraft>(() => draftOf(saved));
   const [imported, setImported] = useState<ImportedLogo | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -80,6 +91,8 @@ export function QrGenerator({ link, domain, defaultTitle }: { link: ShortLink; d
   const [therestoFailed, setTherestoFailed] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  /** Numéro du dernier import : la lecture d'un import plus ancien, finie après, est ignorée. */
+  const importSeq = useRef(0);
   const savedLogo = useQrLogo(savedPath);
   const save = useSaveQrStyle();
 
@@ -132,7 +145,10 @@ export function QrGenerator({ link, domain, defaultTitle }: { link: ShortLink; d
 
   const onFile = async (file: File | undefined) => {
     if (!file) return;
+    importSeq.current += 1;
+    const seq = importSeq.current;
     const result = await readLogoFile(file, file.name);
+    if (seq !== importSeq.current) return;
     if (!result.ok) {
       setImportError(result.error);
       return;
@@ -151,6 +167,7 @@ export function QrGenerator({ link, domain, defaultTitle }: { link: ShortLink; d
   };
 
   const revert = () => {
+    importSeq.current += 1;
     setDraft(draftOf(saved));
     setImported(null);
     setImportError(null);
@@ -190,14 +207,35 @@ export function QrGenerator({ link, domain, defaultTitle }: { link: ShortLink; d
   };
 
   const base = `qr-${link.slug}`;
+  /**
+   * PNG du style affiché. Logo PNG / JPEG : QR rendu sans l'image, puis image décodée à part et
+   * posée sur le canvas (voir svgToPngBlob) ; le SVG exporté, lui, garde le logo embarqué.
+   */
+  const renderPng = async () => {
+    const geometry = qrLogoGeometry(matrix);
+    if (logoSource?.kind === 'raster' && geometry) {
+      const bare = qrSvg(matrix, {
+        darkColor: draft.fg,
+        lightColor: draft.bg,
+        modules: draft.modules,
+        eyeFrame: draft.eyeFrame,
+        eyeDot: draft.eyeDot,
+        logo: logoSource,
+        rasterLogo: 'omit',
+        pixels: 512,
+      });
+      return svgToPngBlob(bare, PNG_PIXELS, { mime: logoSource.mime, base64: logoSource.base64, geometry });
+    }
+    return svgToPngBlob(svg!, PNG_PIXELS);
+  };
   const exportSvg = () => run('svg', async () => {
     downloadBlob(new Blob([svg!], { type: 'image/svg+xml' }), `${base}.svg`);
   });
   const exportPng = () => run('png', async () => {
-    downloadBlob(await svgToPngBlob(svg!, PNG_PIXELS), `${base}-${PNG_PIXELS}px.png`);
+    downloadBlob(await renderPng(), `${base}-${PNG_PIXELS}px.png`);
   });
   const exportPdf = () => run('pdf', async () => {
-    const png = await svgToPngBlob(svg!, PNG_PIXELS);
+    const png = await renderPng();
     const { buildQrPdf } = await import('@/lib/links/qrPdf');
     const bytes = await buildQrPdf({ pngBytes: new Uint8Array(await png.arrayBuffer()), title, url });
     downloadBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), `${base}-A5.pdf`);

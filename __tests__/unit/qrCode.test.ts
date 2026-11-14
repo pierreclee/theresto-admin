@@ -16,11 +16,13 @@ import {
   bytesToBase64,
   checkQrColors,
   contrastRatio,
+  fitInSquare,
   logoAreaRatio,
   MAX_LOGO_AREA,
   MAX_LOGO_BYTES,
   placeLogoRaster,
   placeLogoSvg,
+  qrLogoGeometry,
   qrSvg,
   QUIET_ZONE_MODULES,
   rasterLogoError,
@@ -354,5 +356,50 @@ describe('PDF A5', () => {
   it('caractères hors de la police standard remplacés', () => {
     const font = { encodeText: (t: string) => { if (t.codePointAt(0)! > 0xff) throw new Error('x'); return null as never; } };
     expect(encodableText(font, 'Café 🍽')).toBe('Café ?');
+  });
+});
+
+describe('géométrie du logo (export PNG d un logo raster)', () => {
+  const url = 'https://go.theresto.fr/flyer-lyon';
+
+  it('sans logo : null ; avec logo : disque et carré du SVG, en unités du viewBox', () => {
+    expect(qrLogoGeometry(buildQrMatrix(url, { withLogo: false }))).toBeNull();
+    const m = buildQrMatrix(url, { withLogo: true });
+    const g = qrLogoGeometry(m)!;
+    const total = m.size + QUIET_ZONE_MODULES * 2;
+    expect(g.total).toBe(total);
+    expect(g.cx).toBe(total / 2);
+    expect(g.cy).toBe(total / 2);
+    expect(g.r).toBe(m.logo!.radius);
+    expect(g.side).toBe(m.logo!.side);
+    expect(g.x + g.side / 2).toBeCloseTo(g.cx);
+    // Mêmes valeurs que le SVG dessiné : disque et image du logo.
+    const svg = qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logo: { kind: 'raster', mime: 'image/png', base64: PNG_1PX_B64 } });
+    const r6 = (n: number) => String(Math.round(n * 1e6) / 1e6);
+    expect(svg).toContain(`<circle cx="${r6(g.cx)}" cy="${r6(g.cy)}" r="${r6(g.r)}" fill="#FFFFFF"/>`);
+    expect(svg).toContain(`<image x="${r6(g.x)}" y="${r6(g.y)}" width="${r6(g.side)}" height="${r6(g.side)}"`);
+  });
+
+  it('rasterLogo omit : disque du fond dessiné, image absente, logo quand même contrôlé', () => {
+    const m = buildQrMatrix(url, { withLogo: true });
+    const logo = { kind: 'raster' as const, mime: 'image/png' as const, base64: PNG_1PX_B64 };
+    const bare = qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logo, rasterLogo: 'omit' });
+    expect(bare).toContain('<circle');
+    expect(bare).not.toContain('<image');
+    expect(bare).not.toContain('clipPath');
+    expect(bare.endsWith('</svg>')).toBe(true);
+    // Le SVG exporté garde le logo embarqué.
+    expect(qrSvg(m, { darkColor: '#000000', lightColor: '#FFFFFF', logo })).toContain('<image');
+    expect(() => qrSvg(m, {
+      darkColor: '#000000', lightColor: '#FFFFFF', rasterLogo: 'omit',
+      logo: { kind: 'raster', mime: 'image/png', base64: b64('<svg onload="x()"/>') },
+    })).toThrow();
+  });
+
+  it('fitInSquare : image inscrite, centrée, sans déformation (xMidYMid meet)', () => {
+    expect(fitInSquare(10, 20, 6, 300, 300)).toEqual({ x: 10, y: 20, width: 6, height: 6 });
+    expect(fitInSquare(10, 20, 6, 300, 100)).toEqual({ x: 10, y: 22, width: 6, height: 2 });
+    expect(fitInSquare(10, 20, 6, 100, 300)).toEqual({ x: 12, y: 20, width: 2, height: 6 });
+    expect(fitInSquare(10, 20, 6, 0, 0)).toEqual({ x: 10, y: 20, width: 6, height: 6 });
   });
 });

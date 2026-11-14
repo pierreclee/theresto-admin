@@ -13,7 +13,7 @@ const calls: Call[] = [];
 let respond: (call: Call) => { data: unknown; error: unknown };
 const logInsert = jest.fn();
 const storage = {
-  exists: jest.fn(),
+  info: jest.fn(),
   upload: jest.fn(),
   remove: jest.fn(),
   download: jest.fn(),
@@ -96,7 +96,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   current = { ...row };
   logInsert.mockResolvedValue({ error: null });
-  storage.exists.mockResolvedValue({ data: true, error: null });
+  // Fichier déposé pour ce lien (métadonnée link_id, passée en camelCase par storage-js).
+  storage.info.mockResolvedValue({ data: { name: NEW_LOGO, metadata: { linkId: ID } }, error: null });
   storage.upload.mockResolvedValue({ data: {}, error: null });
   storage.remove.mockResolvedValue({ data: [], error: null });
   storage.download.mockResolvedValue({ data: new Blob([PNG]), error: null });
@@ -150,16 +151,59 @@ describe('saveShortLinkQrStyleAction', () => {
     const r = await saveShortLinkQrStyleAction(ID, value, T0);
     expect(r).toMatchObject({ ok: false, code: 'invalid-argument' });
     expect(calls).toEqual([]);
-    expect(storage.exists).not.toHaveBeenCalled();
+    expect(storage.info).not.toHaveBeenCalled();
   });
 
   it('logo custom absent du bucket : refusé sans écriture', async () => {
-    storage.exists.mockResolvedValue({ data: false, error: { status: 404 } });
+    storage.info.mockResolvedValue({ data: null, error: { status: 404 } });
     const r = await saveShortLinkQrStyleAction(ID, customStyle, T0);
     expect(r).toMatchObject({ ok: false, code: 'invalid-argument', error: expect.stringContaining('Logo introuvable') });
-    expect(storage.exists).toHaveBeenCalledWith(NEW_LOGO);
+    expect(storage.info).toHaveBeenCalledWith(NEW_LOGO);
     expect(bucketNames).toEqual(['qr-logos']);
     expect(writes()).toEqual([]);
+  });
+
+  it('logo déposé pour un autre lien : refusé sans écriture', async () => {
+    storage.info.mockResolvedValue({ data: { name: NEW_LOGO, metadata: { linkId: '99999999-2222-4333-8444-555555555555' } }, error: null });
+    const r = await saveShortLinkQrStyleAction(ID, customStyle, T0);
+    expect(r).toMatchObject({ ok: false, code: 'invalid-argument', error: expect.stringContaining("pas été importé pour ce lien") });
+    expect(writes()).toEqual([]);
+    expect(logInsert).not.toHaveBeenCalled();
+  });
+
+  it('logo sans métadonnée de lien : refusé, sauf s il est déjà le logo enregistré de ce lien', async () => {
+    storage.info.mockResolvedValue({ data: { name: NEW_LOGO, metadata: {} }, error: null });
+    await expect(saveShortLinkQrStyleAction(ID, customStyle, T0)).resolves.toMatchObject({ ok: false, code: 'invalid-argument' });
+    expect(writes()).toEqual([]);
+    // Déjà enregistré pour ce lien (fichier déposé avant la métadonnée) : seules les formes changent.
+    current = { ...row, qr_style: { ...customStyle, modules: 'square' } };
+    await expect(saveShortLinkQrStyleAction(ID, customStyle, T0)).resolves.toMatchObject({ ok: true });
+    expect(writes()).toHaveLength(1);
+  });
+
+  it('métadonnée lue sous user_metadata (autre version de l API) : acceptée', async () => {
+    storage.info.mockResolvedValue({ data: { name: NEW_LOGO, metadata: { size: 1 }, userMetadata: { link_id: ID } }, error: null });
+    await expect(saveShortLinkQrStyleAction(ID, customStyle, T0)).resolves.toMatchObject({ ok: true });
+  });
+
+  it('vérification du logo impossible (erreur sans statut) : indisponible, sans écriture', async () => {
+    storage.info.mockResolvedValue({ data: null, error: { message: 'fetch failed' } });
+    await expect(saveShortLinkQrStyleAction(ID, customStyle, T0)).resolves.toMatchObject({ ok: false, code: 'unavailable' });
+    expect(writes()).toEqual([]);
+  });
+
+  it('logo custom et conflit updated_at : refusé avant toute vérification du fichier', async () => {
+    await expect(saveShortLinkQrStyleAction(ID, customStyle, T1)).resolves.toMatchObject({ ok: false, code: 'conflict' });
+    expect(storage.info).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['contraste insuffisant', { ...style, fg: '#BBBBBB', bg: '#FFFFFF' }, /Contraste insuffisant/],
+    ['QR inversé', { ...style, fg: '#FFFFFF', bg: '#111111' }, /plus clair que les modules/],
+  ])('couleurs refusées par le serveur (%s) : message en français, aucune lecture', async (_label, value, message) => {
+    const r = await saveShortLinkQrStyleAction(ID, value, T0);
+    expect(r).toMatchObject({ ok: false, code: 'invalid-argument', error: expect.stringMatching(message) });
+    expect(calls).toEqual([]);
   });
 
   it('conflit updated_at : aucune écriture', async () => {
@@ -217,10 +261,13 @@ describe('uploadQrLogoAction', () => {
     expect(r.ok).toBe(true);
     const logoPath = r.ok ? r.data.logoPath : '';
     expect(logoPath).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.png$/);
-    expect(storage.upload).toHaveBeenCalledWith(logoPath, expect.any(Uint8Array), { contentType: 'image/png', upsert: false });
+    expect(storage.upload).toHaveBeenCalledWith(logoPath, expect.any(Uint8Array), {
+      contentType: 'image/png', upsert: false, metadata: { link_id: ID },
+    });
+    expect(Buffer.from(storage.upload.mock.calls[0][1])).toEqual(PNG);
     expect(logged()).toEqual([expect.objectContaining({
       action: 'upload_qr_logo', target_type: 'link', target_id: ID,
-      details: { slug: 'flyer-lyon', extension: 'png', bytes: PNG.length },
+      details: { slug: 'flyer-lyon', extension: 'png', bytes: PNG.length, logoPath },
     })]);
     expect(JSON.stringify(logged())).not.toContain('Mon Logo');
   });
@@ -228,11 +275,28 @@ describe('uploadQrLogoAction', () => {
   it('SVG filtré par le même filtre que le moteur', async () => {
     const ok = await uploadQrLogoAction(form(new Blob([LOGO_SVG]), 'logo.svg'));
     expect(ok.ok).toBe(true);
-    expect(storage.upload).toHaveBeenCalledWith(expect.stringMatching(/\.svg$/), expect.any(Uint8Array), { contentType: 'image/svg+xml', upsert: false });
+    expect(storage.upload).toHaveBeenCalledWith(expect.stringMatching(/\.svg$/), expect.any(Uint8Array), {
+      contentType: 'image/svg+xml', upsert: false, metadata: { link_id: ID },
+    });
     storage.upload.mockClear();
     const evil = await uploadQrLogoAction(form(new Blob(['<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1 1"><script>alert(1)</script></svg>']), 'logo.svg'));
     expect(evil).toMatchObject({ ok: false, code: 'invalid-argument', error: expect.stringMatching(/^Logo SVG refusé/) });
     expect(storage.upload).not.toHaveBeenCalled();
+  });
+
+  it('SVG : la version nettoyée par le filtre est déposée, jamais l original', async () => {
+    const original = '<?xml version="1.0"?>\n<!-- éditeur -->\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:sodipodi="http://sodipodi" '
+      + 'width="10" height="10" viewBox="0 0 10 10" fill="#FF6B35" data-x="1"><title>Logo</title>'
+      + '<style>.a { fill: #111111; }</style><rect class="a" id="r" width="10" height="10" data-y="1"/></svg>';
+    const r = await uploadQrLogoAction(form(new Blob([original]), 'logo.svg'));
+    expect(r.ok).toBe(true);
+    const stored = Buffer.from(storage.upload.mock.calls[0][1]).toString('utf8');
+    expect(stored).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" viewBox="0 0 10 10">.*<\/svg>$/);
+    for (const gone of ['<?xml', '<!--', 'sodipodi', '<title', '<style', 'class=', 'data-x', 'data-y', 'width="10" height="10" viewBox']) {
+      expect(stored).not.toContain(gone);
+    }
+    expect(stored).toContain('fill="#111111"');
+    expect(logged()[0]).toMatchObject({ details: { bytes: Buffer.byteLength(stored) } });
   });
 
   it('fichier trop gros : refusé sans dépôt', async () => {

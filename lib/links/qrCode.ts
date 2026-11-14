@@ -272,6 +272,47 @@ export function placeLogoRaster(mime: RasterMime, base64: string, x: number, y: 
     + `preserveAspectRatio="xMidYMid meet" href="data:${mime};base64,${base64}"/>`;
 }
 
+/** Géométrie du logo dans le SVG du QR, en unités du viewBox (une unité = un module). */
+export interface QrLogoGeometry {
+  /** Côté du viewBox (code + zones de silence). */
+  total: number;
+  /** Centre et rayon du disque (fond et découpe du logo). */
+  cx: number;
+  cy: number;
+  r: number;
+  /** Carré où le logo est inscrit (coin haut gauche, côté). */
+  x: number;
+  y: number;
+  side: number;
+}
+
+/** Géométrie du logo de `matrix` dans son SVG (qrSvg), ou null sans logo. */
+export function qrLogoGeometry(matrix: QrMatrix): QrLogoGeometry | null {
+  if (!matrix.logo) return null;
+  const total = matrix.size + QUIET_ZONE_MODULES * 2;
+  const { center, radius, side } = matrix.logo;
+  const c = center + QUIET_ZONE_MODULES;
+  return { total, cx: c, cy: c, r: radius, x: c - side / 2, y: c - side / 2, side };
+}
+
+/**
+ * Rectangle d'une image `width`×`height` inscrite dans le carré (x, y, side), centrée, sans
+ * déformation : comme preserveAspectRatio="xMidYMid meet" de l'<image> du SVG.
+ */
+export function fitInSquare(
+  x: number,
+  y: number,
+  side: number,
+  width: number,
+  height: number,
+): { x: number; y: number; width: number; height: number } {
+  if (!(width > 0) || !(height > 0)) return { x, y, width: side, height: side };
+  const scale = side / Math.max(width, height);
+  const w = width * scale;
+  const h = height * scale;
+  return { x: x + (side - w) / 2, y: y + (side - h) / 2, width: w, height: h };
+}
+
 /** Rectangle à coins arrondis (rayons tl, tr, br, bl), sens horaire ; rayon 0 = coin droit. */
 function roundedRect(x: number, y: number, w: number, h: number, [tl, tr, br, bl]: number[]): string {
   const arc = (r: number, ex: number, ey: number) => (r > 0 ? `A${fmt(r)} ${fmt(r)} 0 0 1 ${fmt(ex)} ${fmt(ey)}` : '');
@@ -438,6 +479,11 @@ export interface QrSvgOptions {
   eyeDot?: QrEyeShape;
   /** Logo, obligatoire si la matrice a une zone de logo. */
   logo?: LogoSource;
+  /**
+   * Logo PNG / JPEG : 'embed' (défaut) l'embarque en data: ; 'omit' dessine le disque sans
+   * l'image, que l'export PNG pose ensuite lui-même sur le canvas (svgToPngBlob).
+   */
+  rasterLogo?: 'embed' | 'omit';
   pixels?: number;
 }
 
@@ -462,13 +508,19 @@ export function qrSvg(matrix: QrMatrix, options: QrSvgOptions): string {
     `<path fill="${fg}" fill-rule="evenodd"${crisp(eyeFrame === 'square')} d="${eyes.frames}"/>`,
     `<path fill="${fg}"${crisp(eyeDot === 'square')} d="${eyes.dots}"/>`,
   ];
-  if (matrix.logo) {
+  const geometry = qrLogoGeometry(matrix);
+  if (geometry) {
     if (!options.logo) throw new Error('Logo manquant');
-    const { center, radius, side } = matrix.logo;
-    const c = center + q;
+    const { cx: c, r: radius, x: at, side } = geometry;
     // Disque de la couleur du fond, par-dessus les bords des modules voisins.
     parts.push(`<circle cx="${fmt(c)}" cy="${fmt(c)}" r="${fmt(radius)}" fill="${options.lightColor}"/>`);
-    const at = c - side / 2;
+    if (options.logo.kind === 'raster' && options.rasterLogo === 'omit') {
+      // Contrôlé quand même : l'image posée ensuite doit être celle qu'on aurait embarquée.
+      const error = rasterLogoError(options.logo.mime, options.logo.base64);
+      if (error) throw new Error(error);
+      parts.push('</svg>');
+      return parts.join('');
+    }
     const n = nextIdNumber();
     const logo = options.logo.kind === 'svg'
       ? placeLogoSvg(options.logo.markup, at, at, side, `lg-${n}-`)

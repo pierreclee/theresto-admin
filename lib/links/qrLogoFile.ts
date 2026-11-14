@@ -13,6 +13,8 @@ import {
   type LogoSource,
 } from './qrCode';
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 export type LogoExtension = 'svg' | 'png' | 'jpg';
 
 export type LogoFileResult =
@@ -64,4 +66,14 @@ export function checkLogoBytes(bytes: Uint8Array, name: string): LogoFileResult 
   const error = rasterLogoError(mime, base64);
   if (error) return { ok: false, error };
   return { ok: true, source: { kind: 'raster', mime, base64 }, extension };
+}
+
+/**
+ * SVG autonome tel que le filtre l'a resérialisé : racine `<svg xmlns viewBox>` reconstruite,
+ * contenu de la liste blanche seulement. C'est ce fichier, jamais l'original, qui est déposé
+ * dans qr-logos. Lève une erreur en français si le filtre refuse le logo.
+ */
+export function cleanedSvgFile(markup: string): string {
+  const { inner, viewBox } = sanitizeLogoSvg(markup);
+  return `<svg xmlns="${SVG_NS}" viewBox="${viewBox.join(' ')}">${inner}</svg>`;
 }
