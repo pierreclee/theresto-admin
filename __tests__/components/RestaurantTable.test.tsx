@@ -31,6 +31,25 @@ describe('RestaurantTable', () => {
     expect(screen.getByText('Aucune donnée')).toBeInTheDocument();
   });
 
+  it('badge rouge seul pour un restaurant en alerte, types dans l’aria-label', () => {
+    const alerts = new Map([['r1', [
+      { restaurantId: 'r1', restaurantName: 'Le Bistro', kind: 'pending_lapse', severity: 'warning', since: null, metrics: {} },
+      { restaurantId: 'r1', restaurantName: 'Le Bistro', kind: 'ontime_x', severity: 'info', since: null, metrics: {} },
+    ]]]);
+    render(
+      <RestaurantTable
+        restaurants={[makeRestaurant(), makeRestaurant({ id: 'r2', name: 'Calme' })]}
+        loading={false}
+        onRowClick={jest.fn()}
+        alertsByRestaurant={alerts}
+      />,
+    );
+    const dots = screen.getAllByRole('img', { name: /^En alerte/ });
+    expect(dots).toHaveLength(1);
+    expect(dots[0]).toHaveAttribute('aria-label', 'En alerte : Demandes non confirmées à la fin du service, Autre alerte');
+    expect(dots[0]).toHaveTextContent('');
+  });
+
   it('renders restaurant name and email', () => {
     const r = makeRestaurant();
     render(<RestaurantTable restaurants={[r]} loading={false} onRowClick={jest.fn()} />);
