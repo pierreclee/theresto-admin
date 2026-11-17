@@ -135,6 +135,31 @@ Section « Versions de l'app mobile » de `/config` : version et build minimaux 
 (409) et journalise elle-même (`update_app_version_policy`, refus 503 si le journal échoue). Contrat :
 `docs/features/app-version-policy.md` du dépôt theresto_app.
 
+## Alertes des restaurants (chantier B, lot B6)
+
+Contrat : `docs/features/admin-restaurant-alerts.md` du dépôt theresto_app. Server Actions
+`lib/actions/restaurantAlerts.ts` (RPC `service_role`, après `requireAdmin()`).
+
+- **Liste des restaurants :** point rouge (sans texte) à côté du nom d'un restaurant en alerte,
+  types dans l'`aria-label` et l'infobulle ; alertes lues une fois pour toute la liste.
+- **Tableau de bord :** carte « Restaurants en alerte » (nombre de restaurants, liste regroupée, pastille
+  par type selon la gravité, lien vers la fiche). Un type inconnu (chantier C) s'affiche « Autre alerte ».
+- **Fiche d'un restaurant :** encadré « Alertes » et bloc « Demandes non confirmées » (compteur, demandes
+  reçues App + widget au service passé, taux sur 30 jours, comparaison avec les 30 jours d'avant, seuils,
+  évolution sur 12 semaines avec tableau, fermetures des 30 derniers jours paginées par 20, sans donnée
+  de client ni identifiant ; la réponse est réduite aux champs du contrat avant d'atteindre le navigateur).
+- **Journal :** `view_restaurant_alerts`, `view_restaurant_pending_lapse_stats`,
+  `view_restaurant_pending_lapses` (nombres et id du restaurant seulement) ; consultation refusée si le
+  journal échoue (`adminLogRefusal()`).
+- **`/config`, « Seuils d'alerte » :** N (nombre) et X (saisi en %, envoyé en fraction à 4 décimales),
+  début du suivi, date et auteur de la dernière modification. Écriture conditionnée à `updated_at`
+  (PT409 → « modifiés entre-temps »), journalisée (`update_restaurant_alert_settings`, cible `config`,
+  `previous` → `current`) ; journal impossible : anciennes valeurs remises et modification refusée. Pas de
+  code TOTP de 5 minutes (seuil d'affichage).
+- **`/config`, commissions Essentiel :** état et interrupteur « Commission gardée sur les déclarations
+  tardives » (CGV 6.2, action `setLateDeclarationCommissionRule` de `commission-settings` : code TOTP,
+  version `lateDeclarationRule.updatedAt`, journalisée par l'Edge Function).
+
 ## Key Documentation
 
 - [Deployment Guide](./docs/DEPLOYMENT.md) — Vercel, environment setup, custom domain
