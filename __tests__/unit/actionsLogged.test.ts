@@ -37,6 +37,8 @@ const EXEMPT: Record<string, string> = {
   setRestaurantOnlineRateAction: 'journalisée par l Edge Function commission-settings',
   updateGlobalPrivatizationRatesAction: 'journalisée par l Edge Function commission-settings',
   setRestaurantPrivatizationRateAction: 'journalisée par l Edge Function commission-settings',
+  setLateDeclarationCommissionRuleAction:
+    'journalisée par l Edge Function commission-settings (set_late_declaration_commission_rule)',
   // invitations.ts
   inviteRestaurantOwnerAction:
     'journalisée par l Edge Function admin-onboarding (create_restaurant_invitation), auditLogged renvoyé',

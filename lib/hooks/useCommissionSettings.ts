@@ -6,6 +6,7 @@ import {
   getRestaurantCommissionAction,
   resetRestaurantCommissionRatesAction,
   setRestaurantOnlineRateAction,
+  setLateDeclarationCommissionRuleAction,
   setRestaurantPrivatizationRateAction,
   updateGlobalCommissionRatesAction,
   updateGlobalOnlineRatesAction,
@@ -296,5 +297,38 @@ export function useSetRestaurantPrivatizationRate(restaurantId: string) {
       else toast(rate === null ? 'Le restaurant suit de nouveau le taux de son plan' : 'Taux particulier enregistré');
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: ['restaurantCommission', restaurantId] }),
+  });
+}
+
+export function useSetLateDeclarationCommissionRule() {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      totpCode,
+      ...input
+    }: {
+      enabled: boolean;
+      expectedUpdatedAt: string | null;
+      totpCode: string;
+    }) => {
+      await verifyTotpCode(totpCode);
+      const result = await setLateDeclarationCommissionRuleAction(input);
+      if (!result.ok) {
+        const message = result.code === 'failed-precondition'
+          ? 'La règle a été modifiée entre-temps : vérifiez son nouvel état puis recommencez.'
+          : commissionErrorMessage(result.code, result.error);
+        throw new CommissionMutationError(message, result.code);
+      }
+      return result.data;
+    },
+    onSuccess: ({ auditLogged }, { enabled }) => {
+      if (!auditLogged) {
+        toast("La règle a bien été modifiée, mais la modification n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+      } else {
+        toast(enabled ? 'Commission gardée sur les déclarations tardives' : 'Déclarations tardives de nouveau sans commission');
+      }
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['commissionSettings'] }),
   });
 }

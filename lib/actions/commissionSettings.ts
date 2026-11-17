@@ -5,6 +5,7 @@ import { invokeEdgeFunction, type ActionResult } from '@/lib/supabase/invokeFunc
 import type {
   CommissionMonthlyTotal,
   CommissionSettings,
+  LateDeclarationRule,
   PlanCommissionRates,
   RestaurantCommission,
 } from '@/lib/types/commissions';
@@ -28,6 +29,8 @@ export async function getCommissionSettingsAction(): Promise<
     settings: CommissionSettings;
     onlineRates: PlanCommissionRates;
     privatizationRates: PlanCommissionRates;
+    /** Absente d'une Edge Function déployée avant le chantier B. */
+    lateDeclarationRule?: LateDeclarationRule;
     totals: CommissionMonthlyTotal[];
   }>
 > {
@@ -142,6 +145,22 @@ export async function setRestaurantPrivatizationRateAction(input: {
     action: 'setRestaurantPrivatizationRate',
     restaurantId: input.restaurantId,
     rate: input.rate,
+    expectedUpdatedAt: input.expectedUpdatedAt ?? null,
+  });
+}
+
+/**
+ * Commission gardée sur un no-show ou une annulation déclarés après le passage en « réputée
+ * honorée » (CGV 6.2). expectedUpdatedAt : lateDeclarationRule.updatedAt lu (null au départ).
+ */
+export async function setLateDeclarationCommissionRuleAction(input: {
+  enabled: boolean;
+  expectedUpdatedAt: string | null;
+}): Promise<ActionResult<CommissionUpdateResult>> {
+  await requireAdmin();
+  return invokeEdgeFunction(FUNCTION_NAME, {
+    action: 'setLateDeclarationCommissionRule',
+    enabled: input.enabled === true,
     expectedUpdatedAt: input.expectedUpdatedAt ?? null,
   });
 }

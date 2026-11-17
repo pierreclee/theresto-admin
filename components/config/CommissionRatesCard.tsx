@@ -3,15 +3,23 @@
 import { useState } from 'react';
 import { AlertTriangle, Pencil } from 'lucide-react';
 import { CommissionRatesModal } from '@/components/config/CommissionRatesModal';
-import { useCommissionSettings, useUpdateGlobalCommissionRates } from '@/lib/hooks/useCommissionSettings';
+import {
+  useCommissionSettings,
+  useSetLateDeclarationCommissionRule,
+  useUpdateGlobalCommissionRates,
+} from '@/lib/hooks/useCommissionSettings';
 import { formatEuro, formatPeriod } from '@/lib/utils/commissionRates';
 
 /** Tarif global des commissions du plan Essentiel + totaux mensuels facturés. */
 export function CommissionRatesCard() {
   const { data, isPending, error } = useCommissionSettings();
   const { mutateAsync } = useUpdateGlobalCommissionRates();
+  const setLateRule = useSetLateDeclarationCommissionRule();
   const [editing, setEditing] = useState(false);
+  // Valeur visée, figée à l'ouverture : après un conflit, l'état rechargé ne retourne pas l'action.
+  const [lateRuleTarget, setLateRuleTarget] = useState<boolean | null>(null);
   const settings = data?.settings;
+  const lateRule = data?.lateDeclarationRule;
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -61,6 +69,36 @@ export function CommissionRatesCard() {
             ))}
           </dl>
 
+          {lateRule && (
+            <div className="mx-5 mb-5 flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-100 bg-gray-50">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-gray-800">Commission gardée sur les déclarations tardives</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  No-show ou annulation déclarés après le passage automatique en « réputée honorée » (CGV 6.2) : la
+                  commission reste due.
+                </p>
+                <p className="text-xs mt-1" data-testid="late-rule-state">
+                  <span className={`font-semibold ${lateRule.enabled ? 'text-green-700' : 'text-gray-500'}`}>
+                    {lateRule.enabled ? 'Activée' : 'Désactivée'}
+                  </span>
+                  {lateRule.updatedAt && (
+                    <span className="text-gray-400">
+                      {' '}depuis le {new Date(lateRule.updatedAt).toLocaleString('fr-FR', {
+                        day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris',
+                      })}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button
+                onClick={() => setLateRuleTarget(!lateRule.enabled)}
+                className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 bg-white rounded-lg hover:text-[#FF6B35] hover:border-[#FF6B35]/30 hover:bg-orange-50 transition-colors flex-shrink-0"
+              >
+                {lateRule.enabled ? 'Désactiver' : 'Activer'}
+              </button>
+            </div>
+          )}
+
           <div className="px-5 pb-5">
             <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">12 derniers mois</h4>
             {data.totals.length === 0 ? (
@@ -89,6 +127,23 @@ export function CommissionRatesCard() {
             )}
           </div>
         </>
+      )}
+
+      {lateRuleTarget !== null && lateRule && (
+        <CommissionRatesModal
+          title={lateRuleTarget ? 'Activer la règle' : 'Désactiver la règle'}
+          fields={[]}
+          warning={
+            !lateRuleTarget
+              ? 'Les no-show et annulations déclarés tardivement à partir de maintenant ne seront plus commissionnés. Les commissions déjà gardées restent dues.'
+              : 'Les no-show et annulations déclarés après le passage en « réputée honorée » resteront commissionnés, couverts et date figés à la fin du service.'
+          }
+          confirmLabel={lateRuleTarget ? 'Activer' : 'Désactiver'}
+          onConfirm={async (_values, totpCode) => {
+            await setLateRule.mutateAsync({ enabled: lateRuleTarget, expectedUpdatedAt: lateRule.updatedAt, totpCode });
+          }}
+          onClose={() => setLateRuleTarget(null)}
+        />
       )}
 
       {editing && settings && (
