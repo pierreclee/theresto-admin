@@ -34,6 +34,7 @@ import { formatPercent } from '@/lib/utils/commissionRates';
 import { CommissionSection } from './CommissionSection';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { BillingSection } from './BillingSection';
+import { PendingLapsesSection, RestaurantAlertsBox } from './PendingLapsesSection';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
@@ -335,6 +336,9 @@ export function RestaurantDetail({ restaurant }: Props) {
           </div>
         </div>
 
+        {/* Alertes en cours (admin_restaurant_alerts) */}
+        <RestaurantAlertsBox restaurantId={restaurant.id} />
+
         {/* Photo principale */}
         {(restaurant.main_photo_url || restaurant.mainPhotoUrl) && (
           <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -494,6 +498,9 @@ export function RestaurantDetail({ restaurant }: Props) {
 
         {/* Commissions de réservation (plan Essentiel) */}
         <CommissionSection restaurantId={restaurant.id} />
+
+        {/* Demandes non confirmées à la fin du service (30 jours, 12 semaines) */}
+        <PendingLapsesSection restaurantId={restaurant.id} />
 
         {/* Informations techniques */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

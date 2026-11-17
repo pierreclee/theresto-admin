@@ -5,6 +5,8 @@ import { useState } from 'react';
 import { Restaurant } from '@/lib/types/restaurant';
 import { Table } from '@/components/shared/Table';
 import { SubscriptionModal } from '@/components/restaurants/SubscriptionModal';
+import { RestaurantAlertDot } from '@/components/alerts/RestaurantAlertDot';
+import type { RestaurantAlert } from '@/lib/types/restaurantAlerts';
 
 const approvalLabel: Record<string, { label: string; className: string }> = {
   approved: { label: 'Approuvé', className: 'bg-green-50 text-green-700 border-green-100' },
@@ -34,16 +36,28 @@ interface RestaurantTableProps {
   restaurants: Restaurant[];
   loading: boolean;
   onRowClick: (restaurant: Restaurant) => void;
+  /** Alertes par restaurant (admin_restaurant_alerts), chargées une fois pour toute la liste. */
+  alertsByRestaurant?: Map<string, RestaurantAlert[]>;
 }
 
-export function RestaurantTable({ restaurants, loading, onRowClick }: RestaurantTableProps) {
+export function RestaurantTable({ restaurants, loading, onRowClick, alertsByRestaurant }: RestaurantTableProps) {
   const [subscriptionTarget, setSubscriptionTarget] = useState<Restaurant | null>(null);
 
   return (
     <>
       <Table<Restaurant>
         columns={[
-          { key: 'name', label: 'Restaurant', width: 'w-1/4' },
+          {
+            key: 'name',
+            label: 'Restaurant',
+            width: 'w-1/4',
+            render: (v, row) => (
+              <span className="inline-flex items-center gap-2">
+                <span>{String(v ?? '')}</span>
+                <RestaurantAlertDot alerts={alertsByRestaurant?.get(row.id)} />
+              </span>
+            ),
+          },
           { key: 'email', label: 'Email', width: 'w-1/4' },
           {
             key: 'approval_status',

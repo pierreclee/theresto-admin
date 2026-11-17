@@ -34,13 +34,15 @@ const routes: { href: string; label: string; icon: React.ElementType; exact?: bo
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { adminUser, signOut } = useAuth();
+  const { adminUser, signOut, isAdmin, sessionValid } = useAuth();
   const router = useRouter();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Fetch pending approvals count
-  const { data: pendingData } = useRestaurants({ status: TO_REVIEW_STATUSES });
-  const openIncidentCount = useOpenIncidentCount();
+  // Badges : aucune requête sur les pages de connexion ni hors session admin valide
+  // (sinon une session expirée renvoie des 500 à chaque essai).
+  const badgesEnabled = !pathname.startsWith('/auth/') && isAdmin && sessionValid;
+  const { data: pendingData } = useRestaurants({ status: TO_REVIEW_STATUSES }, { enabled: badgesEnabled });
+  const openIncidentCount = useOpenIncidentCount(badgesEnabled);
 
   if (pathname.startsWith('/auth/')) return null;
 

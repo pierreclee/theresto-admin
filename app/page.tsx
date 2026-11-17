@@ -3,6 +3,7 @@
 import { usePlatformStats } from '@/lib/hooks/usePlatformStats';
 import { useAuditLogs } from '@/lib/hooks/useAuditLogs';
 import { useRouter } from 'next/navigation';
+import { RestaurantAlertsCard } from '@/components/alerts/RestaurantAlertsCard';
 import {
   Store,
   Clock,
@@ -146,6 +147,9 @@ export default function DashboardPage() {
           </>
         )}
       </div>
+
+      {/* Restaurants en alerte (admin_restaurant_alerts) */}
+      <RestaurantAlertsCard />
 
       {/* Bottom row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -37,6 +37,8 @@ const EXEMPT: Record<string, string> = {
   setRestaurantOnlineRateAction: 'journalisée par l Edge Function commission-settings',
   updateGlobalPrivatizationRatesAction: 'journalisée par l Edge Function commission-settings',
   setRestaurantPrivatizationRateAction: 'journalisée par l Edge Function commission-settings',
+  setLateDeclarationCommissionRuleAction:
+    'journalisée par l Edge Function commission-settings (set_late_declaration_commission_rule)',
   // invitations.ts
   inviteRestaurantOwnerAction:
     'journalisée par l Edge Function admin-onboarding (create_restaurant_invitation), auditLogged renvoyé',
@@ -47,6 +49,10 @@ const EXEMPT: Record<string, string> = {
   retryPrivatizationRefundAction: 'journalisée par l Edge Function admin-privatization-incidents',
   returnPrivatizationCustomerBalanceAction: 'journalisée par l Edge Function admin-privatization-incidents',
   resolvePrivatizationIncidentAction: 'journalisée par l Edge Function admin-privatization-incidents',
+  // restaurantAlerts.ts
+  getAlertSettingsAction:
+    'seuils d alerte de la plateforme (N, X), aucune donnée de client ; auteur = e-mail d un admin, '
+    + 'comme performed_by_email du journal (getAuditLogsAction)',
   // shortLinks.ts
   listShortLinksAction: 'liens courts et compteurs de scans agrégés, aucune donnée personnelle',
   getShortLinkAction: 'un lien court (cibles, attributs), aucune donnée personnelle',

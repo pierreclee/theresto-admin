@@ -15,6 +15,7 @@ import { PrivatizationCommissionRatesCard } from '@/components/config/Privatizat
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 import { AppVersionPoliciesCard } from '@/components/config/AppVersionPoliciesCard';
+import { RestaurantAlertSettingsCard } from '@/components/config/RestaurantAlertSettingsCard';
 
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
@@ -191,6 +192,9 @@ export default function ConfigPage() {
 
       {/* Booking commissions (Essentiel plan) */}
       <CommissionRatesCard />
+
+      {/* Seuils d'alerte des demandes non confirmées (restaurant_alert_settings) */}
+      <RestaurantAlertSettingsCard />
 
       {/* Version minimale et recommandée de l'app mobile (Edge Function app-version-settings) */}
       <AppVersionPoliciesCard />

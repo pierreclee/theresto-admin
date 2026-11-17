@@ -1,9 +1,10 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { COMMISSION_CONFLICT_MESSAGE, CommissionMutationError } from '@/lib/utils/commissionRates';
 
 const mutateAsync = jest.fn();
+const setLateRule = jest.fn();
 
 const loadedQuery = {
   data: {
@@ -25,6 +26,7 @@ function submitGuestFee(value: string) {
 jest.mock('@/lib/hooks/useCommissionSettings', () => ({
   useCommissionSettings: () => mockQuery,
   useUpdateGlobalCommissionRates: () => ({ mutateAsync }),
+  useSetLateDeclarationCommissionRule: () => ({ mutateAsync: setLateRule }),
 }));
 
 describe('CommissionRatesCard', () => {
@@ -156,5 +158,50 @@ describe('CommissionRatesCard', () => {
     };
     rerender(<CommissionRatesCard />);
     expect(screen.getByLabelText('Par couvert')).toHaveValue('0,40');
+  });
+
+  describe('commission gardée sur les déclarations tardives', () => {
+    const withRule = (enabled: boolean, updatedAt: string | null) => ({
+      ...loadedQuery,
+      data: { ...loadedQuery.data, lateDeclarationRule: { enabled, updatedAt } },
+    });
+
+    it('absente d une ancienne Edge Function : rien d affiché', () => {
+      render(<CommissionRatesCard />);
+      expect(screen.queryByText('Commission gardée sur les déclarations tardives')).toBeNull();
+    });
+
+    it('affiche l état et désactive avec le code et la version lue', async () => {
+      mockQuery = withRule(true, '2026-11-17T09:00:00Z') as typeof loadedQuery;
+      setLateRule.mockResolvedValue({ updatedAt: '2026-11-17T10:00:00Z', auditLogged: true });
+      render(<CommissionRatesCard />);
+      expect(screen.getByTestId('late-rule-state')).toHaveTextContent(/^Activée depuis le 17 nov\. 2026/);
+      fireEvent.click(screen.getByText('Désactiver'));
+      fireEvent.change(screen.getByLabelText(/Code de votre application/), { target: { value: '123456' } });
+      fireEvent.click(screen.getAllByText('Désactiver').at(-1)!);
+      await waitFor(() => expect(setLateRule).toHaveBeenCalledWith({
+        enabled: false, expectedUpdatedAt: '2026-11-17T09:00:00Z', totpCode: '123456',
+      }));
+    });
+
+    it('après un conflit, garde la valeur visée à l ouverture', async () => {
+      mockQuery = withRule(false, null) as typeof loadedQuery;
+      setLateRule.mockRejectedValueOnce(new CommissionMutationError('modifiée entre-temps', 'failed-precondition'));
+      const { rerender } = render(<CommissionRatesCard />);
+      fireEvent.click(screen.getByText('Activer'));
+      fireEvent.change(screen.getByLabelText(/Code de votre application/), { target: { value: '123456' } });
+      fireEvent.click(screen.getAllByText('Activer').at(-1)!);
+      expect(await screen.findByRole('alert')).toHaveTextContent('modifiée entre-temps');
+
+      // Un autre admin l'a activée entre-temps : la modale vise toujours « activée ».
+      mockQuery = withRule(true, '2026-11-17T09:30:00Z') as typeof loadedQuery;
+      rerender(<CommissionRatesCard />);
+      setLateRule.mockResolvedValueOnce({ updatedAt: '2026-11-17T10:00:00Z', auditLogged: true });
+      fireEvent.change(screen.getByLabelText(/Code de votre application/), { target: { value: '654321' } });
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Activer' }));
+      await waitFor(() => expect(setLateRule).toHaveBeenLastCalledWith({
+        enabled: true, expectedUpdatedAt: '2026-11-17T09:30:00Z', totpCode: '654321',
+      }));
+    });
   });
 });

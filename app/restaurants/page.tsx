@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useMemo, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
+import { useRestaurantAlerts } from '@/lib/hooks/useRestaurantAlerts';
+import type { RestaurantAlert } from '@/lib/types/restaurantAlerts';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { RestaurantTable } from '@/components/restaurants/RestaurantTable';
 import { InviteRestaurantModal } from '@/components/restaurants/InviteRestaurantModal';
@@ -20,6 +22,15 @@ function RestaurantsContent() {
     search: search || undefined,
     status: status || LISTED_STATUSES,
   });
+  // Alertes de tous les restaurants en une lecture (badge rouge de la liste).
+  const alerts = useRestaurantAlerts();
+  const alertsByRestaurant = useMemo(() => {
+    const map = new Map<string, RestaurantAlert[]>();
+    for (const alert of alerts.data?.alerts ?? []) {
+      map.set(alert.restaurantId, [...(map.get(alert.restaurantId) ?? []), alert]);
+    }
+    return map;
+  }, [alerts.data]);
 
   return (
     <div className="space-y-5">
@@ -73,7 +84,14 @@ function RestaurantsContent() {
           </div>
         )}
 
+        {alerts.error && (
+          <div className="mx-5 mt-4 p-3 bg-amber-50 border border-amber-100 text-amber-800 rounded-lg text-xs">
+            Alertes non affichées : {actionErrorMessage(alerts.error, 'impossible de charger les alertes.')}
+          </div>
+        )}
+
         <RestaurantTable
+          alertsByRestaurant={alertsByRestaurant}
           restaurants={data?.restaurants ?? []}
           loading={isPending}
           onRowClick={(restaurant) => router.push(`/restaurants/${restaurant.id}`)}

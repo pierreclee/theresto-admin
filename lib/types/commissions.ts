@@ -31,6 +31,16 @@ export interface CommissionInvoiceSummary {
   hostedInvoiceUrl: string | null;
 }
 
+/**
+ * Règle CGV 6.2 : no-show ou annulation déclarés après le passage automatique en « réputée
+ * honorée » restent commissionnés (platform_commission_settings.late_declaration_commission_kept).
+ */
+export interface LateDeclarationRule {
+  enabled: boolean;
+  /** null tant que la règle n'a jamais été écrite. */
+  updatedAt: string | null;
+}
+
 /** Taux globaux d'une commission en pourcentage, par plan (paiements en ligne, privatisations). */
 export interface PlanCommissionRates {
   croissance: number;
