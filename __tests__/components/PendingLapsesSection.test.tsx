@@ -2,6 +2,7 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { PendingLapsesSection, RestaurantAlertsBox } from '@/components/restaurants/PendingLapsesSection';
 import { ActionError } from '@/lib/api/actionResult';
+import { rateAxisMax } from '@/lib/utils/restaurantAlerts';
 
 const RID = '11111111-2222-4333-8444-555555555555';
 let detailQuery: Record<string, unknown>;
@@ -56,6 +57,19 @@ describe('PendingLapsesSection', () => {
     expect(screen.getByText(/Alerte à partir de/).textContent).toMatch(/Alerte à partir de 5 demandes non confirmées/);
   });
 
+  it('courbe : nombre (barres) et taux (ligne, axe de droite, seuil)', () => {
+    render(<PendingLapsesSection restaurantId={RID} />);
+    expect(screen.getByText('Nombre (axe de gauche)')).toBeInTheDocument();
+    expect(screen.getByText('Taux (axe de droite)')).toBeInTheDocument();
+    expect(screen.getByText(/Seuil de taux \(10\s%\)/)).toBeInTheDocument();
+    // Un point par semaine suivie avec un taux ; la semaine non suivie n'en a pas.
+    expect(screen.getAllByTestId('rate-point')).toHaveLength(2);
+    expect(screen.getAllByTestId('rate-line')).toHaveLength(1);
+    expect(screen.getByTestId('rate-threshold')).toBeInTheDocument();
+    // Le tableau dépliable reste là.
+    expect(screen.getByText('Voir le tableau')).toBeInTheDocument();
+  });
+
   it('page suivante', () => {
     render(<PendingLapsesSection restaurantId={RID} />);
     fireEvent.click(screen.getByLabelText('Page suivante'));
@@ -92,5 +106,18 @@ describe('RestaurantAlertsBox', () => {
     alertsQuery = { data: { alerts: [], total: 0, totalRestaurants: 0 }, error: null, isPending: false };
     const { container } = render(<RestaurantAlertsBox restaurantId={RID} />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('rateAxisMax', () => {
+  const w = (rate: number | null, tracked = true) =>
+    ({ period_start: 'a', period_end: 'b', lapsed: 0, total: 0, rate, tracked });
+  it('arrondi à la dizaine supérieure, au moins le seuil, 100 % au plus', () => {
+    expect(rateAxisMax([w(0.03)], 0.1)).toBe(0.1);
+    expect(rateAxisMax([w(0.23)], 0.1)).toBe(0.3);
+    expect(rateAxisMax([w(0.2)], 0.1)).toBe(0.2);
+    expect(rateAxisMax([w(0.05)], 0.35)).toBe(0.4);
+    expect(rateAxisMax([w(1)], 0.1)).toBe(1);
+    expect(rateAxisMax([w(null), w(0.9, false)], null)).toBe(0.1);
   });
 });

@@ -1,5 +1,5 @@
 // Libellés et règles d'affichage des alertes des restaurants (sans dépendance serveur).
-import type { AlertSeverity, RestaurantAlert } from '@/lib/types/restaurantAlerts';
+import type { AlertSeverity, PendingLapseWeek, RestaurantAlert } from '@/lib/types/restaurantAlerts';
 
 export const ALERT_KIND_LABELS: Record<string, string> = {
   restaurant_suspended: 'Restaurant suspendu',
@@ -164,4 +164,11 @@ export function alertDetail(alert: { kind: string; metrics: Record<string, unkno
     default:
       return null;
   }
+}
+
+/** Échelle du taux (axe de droite) : de 10 % en 10 %, au moins jusqu'au seuil, 100 % au plus. */
+export function rateAxisMax(weeks: PendingLapseWeek[], minRate?: number | null): number {
+  const rates = weeks.filter((w) => w.tracked && w.rate !== null).map((w) => w.rate as number);
+  const top = Math.max(0.1, minRate ?? 0, ...rates);
+  return Math.min(1, Math.ceil(top * 10 - 1e-9) / 10);
 }

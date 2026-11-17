@@ -11,6 +11,7 @@ import {
   formatDay,
   formatInstant,
   formatRate,
+  rateAxisMax,
   RESERVATION_TYPE_LABELS,
   SEVERITY_LABELS,
   SOURCE_LABELS,
@@ -85,51 +86,121 @@ function Tile({ label, value, sub, tone = 'gray' }: { label: string; value: stri
 const shortDay = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', timeZone: 'Europe/Paris' });
 
-/** Évolution sur 12 semaines : demandes non confirmées par semaine (une série, un axe). */
-function TrendChart({ weeks }: { weeks: PendingLapseWeek[] }) {
+const BAR_COLOR = '#FF6B35';
+const RATE_COLOR = '#1e3a8a';
+
+/**
+ * Évolution sur 12 semaines : barres = nombre de demandes non confirmées (axe de gauche),
+ * ligne = taux (axe de droite), seuil de taux en pointillés.
+ */
+function TrendChart({ weeks, minRate }: { weeks: PendingLapseWeek[]; minRate?: number | null }) {
   const [hover, setHover] = useState<number | null>(null);
   if (weeks.length === 0) return null;
   const W = 600;
-  const H = 150;
-  const top = 12;
+  const H = 160;
+  const top = 14;
   const bottom = 22;
+  const left = 30;
+  const right = 40;
   const plot = H - top - bottom;
-  const col = W / weeks.length;
+  const col = (W - left - right) / weeks.length;
   const barW = Math.min(28, col - 8);
   const max = Math.max(1, ...weeks.map((w) => w.lapsed));
-  const y = (v: number) => top + plot - (v / max) * plot;
+  const rateMax = rateAxisMax(weeks, minRate);
+  const base = top + plot;
+  const y = (v: number) => base - (v / max) * plot;
+  const yRate = (r: number) => base - (Math.min(r, rateMax) / rateMax) * plot;
+  const cx = (i: number) => left + col * i + col / 2;
   const tip = (w: PendingLapseWeek) =>
     w.tracked
       ? `Semaine du ${shortDay(w.period_start)} au ${shortDay(w.period_end)} : ${w.lapsed} non confirmée(s) sur ${w.total} (${formatRate(w.rate)})`
       : `Semaine du ${shortDay(w.period_start)} au ${shortDay(w.period_end)} : avant le début du suivi`;
 
+  // Ligne du taux : un tronçon par suite de semaines suivies avec un taux (sans relier un trou).
+  const segments: { i: number; r: number }[][] = [];
+  weeks.forEach((w, i) => {
+    if (!w.tracked || w.rate === null) {
+      if (segments.length && segments[segments.length - 1].length) segments.push([]);
+      return;
+    }
+    if (!segments.length) segments.push([]);
+    segments[segments.length - 1].push({ i, r: w.rate });
+  });
+  const points = segments.flat();
+
   return (
     <figure className="space-y-2">
-      <figcaption className="text-xs font-semibold text-gray-500">Demandes non confirmées par semaine (12 semaines)</figcaption>
+      <figcaption className="text-xs font-semibold text-gray-500">Demandes non confirmées par semaine : nombre et taux (12 semaines)</figcaption>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+        <span className="inline-flex items-center gap-1.5">
+          <span aria-hidden className="inline-block w-3 h-3 rounded-sm" style={{ backgroundColor: BAR_COLOR }} />
+          Nombre (axe de gauche)
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <svg aria-hidden width="18" height="10" viewBox="0 0 18 10">
+            <line x1={0} x2={18} y1={5} y2={5} stroke={RATE_COLOR} strokeWidth={2} />
+            <circle cx={9} cy={5} r={3} fill={RATE_COLOR} stroke="#fff" strokeWidth={1} />
+          </svg>
+          Taux (axe de droite)
+        </span>
+        {minRate != null && (
+          <span className="inline-flex items-center gap-1.5">
+            <svg aria-hidden width="18" height="10" viewBox="0 0 18 10">
+              <line x1={0} x2={18} y1={5} y2={5} stroke={RATE_COLOR} strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
+            </svg>
+            Seuil de taux ({formatRate(minRate)})
+          </span>
+        )}
+      </div>
       <div className="relative">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Évolution des demandes non confirmées sur 12 semaines (détail dans le tableau ci-dessous)">
-          <line x1={0} x2={W} y1={top + plot} y2={top + plot} stroke="#e5e7eb" strokeWidth={1} />
-          <text x={0} y={top - 2} fontSize={10} fill="#9ca3af">{max}</text>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="Évolution des demandes non confirmées sur 12 semaines, en nombre et en taux (détail dans le tableau ci-dessous)">
+          <line x1={left} x2={W - right} y1={base} y2={base} stroke="#e5e7eb" strokeWidth={1} />
+          <line x1={left} x2={W - right} y1={top} y2={top} stroke="#f3f4f6" strokeWidth={1} />
+          <text x={left - 6} y={top + 3} fontSize={10} textAnchor="end" fill={BAR_COLOR}>{max}</text>
+          <text x={left - 6} y={base + 3} fontSize={10} textAnchor="end" fill="#9ca3af">0</text>
+          <text x={W - right + 6} y={top + 3} fontSize={10} fill={RATE_COLOR}>{formatRate(rateMax)}</text>
+          <text x={W - right + 6} y={base + 3} fontSize={10} fill="#9ca3af">0 %</text>
           {weeks.map((w, i) => {
-            const cx = col * i + col / 2;
-            const h = Math.max(w.lapsed > 0 ? 2 : 0, top + plot - y(w.lapsed));
+            const h = Math.max(w.lapsed > 0 ? 2 : 0, base - y(w.lapsed));
             return (
               <g key={w.period_start} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
                 {/* Zone de survol plus large que la barre */}
-                <rect x={col * i} y={0} width={col} height={H} fill={hover === i ? '#f9fafb' : 'transparent'}>
+                <rect x={left + col * i} y={0} width={col} height={H} fill={hover === i ? '#f9fafb' : 'transparent'}>
                   <title>{tip(w)}</title>
                 </rect>
                 {w.tracked ? (
-                  <rect x={cx - barW / 2} y={top + plot - h} width={barW} height={h} rx={h > 4 ? 4 : 0} fill="#FF6B35" pointerEvents="none" />
+                  <rect x={cx(i) - barW / 2} y={base - h} width={barW} height={h} rx={h > 4 ? 4 : 0} fill={BAR_COLOR} opacity={0.85} pointerEvents="none" />
                 ) : (
-                  <rect x={cx - barW / 2} y={top + plot - 6} width={barW} height={6} fill="#e5e7eb" pointerEvents="none" />
+                  <rect x={cx(i) - barW / 2} y={base - 6} width={barW} height={6} fill="#e5e7eb" pointerEvents="none" />
                 )}
-                <text x={cx} y={H - 6} fontSize={10} textAnchor="middle" fill={w.tracked ? '#6b7280' : '#d1d5db'} pointerEvents="none">
+                <text x={cx(i)} y={H - 6} fontSize={10} textAnchor="middle" fill={w.tracked ? '#6b7280' : '#d1d5db'} pointerEvents="none">
                   {shortDay(w.period_end)}
                 </text>
               </g>
             );
           })}
+          {minRate != null && minRate <= rateMax && (
+            <line
+              x1={left} x2={W - right} y1={yRate(minRate)} y2={yRate(minRate)}
+              stroke={RATE_COLOR} strokeWidth={1} strokeDasharray="4 4" opacity={0.6} pointerEvents="none"
+              data-testid="rate-threshold"
+            />
+          )}
+          {segments.filter((seg) => seg.length > 1).map((seg) => (
+            <polyline
+              key={`seg-${seg[0].i}`}
+              points={seg.map((p) => `${cx(p.i)},${yRate(p.r)}`).join(' ')}
+              fill="none" stroke={RATE_COLOR} strokeWidth={2} strokeLinejoin="round" pointerEvents="none"
+              data-testid="rate-line"
+            />
+          ))}
+          {points.map((p) => (
+            <circle
+              key={`pt-${p.i}`} cx={cx(p.i)} cy={yRate(p.r)} r={hover === p.i ? 4.5 : 3.5}
+              fill={RATE_COLOR} stroke="#fff" strokeWidth={1.5} pointerEvents="none"
+              data-testid="rate-point"
+            />
+          ))}
         </svg>
         {hover !== null && (
           <p role="status" className="absolute top-0 right-0 max-w-xs text-xs bg-gray-900 text-white rounded-lg px-2.5 py-1.5 shadow">
@@ -275,7 +346,7 @@ export function PendingLapsesSection({ restaurantId }: { restaurantId: string })
         ) : (
           <>
             <Summary detail={data} />
-            <TrendChart weeks={data.trend} />
+            <TrendChart weeks={data.trend} minRate={data.settings.pending_lapse_min_rate} />
             <Closures detail={data} offset={offset} onPage={setOffset} fetching={isFetching} />
           </>
         )}
