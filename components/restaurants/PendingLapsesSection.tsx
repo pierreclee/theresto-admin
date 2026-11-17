@@ -207,22 +207,22 @@ function Closures({ detail, offset, onPage, fetching }: {
         <table className={`w-full text-sm ${fetching ? 'opacity-60' : ''}`}>
           <thead>
             <tr className="text-left text-xs text-gray-400">
-              <th className="font-medium py-1">Date</th>
-              <th className="font-medium py-1">Heure</th>
-              <th className="font-medium py-1 text-right">Couverts</th>
-              <th className="font-medium py-1">Source</th>
-              <th className="font-medium py-1">Type</th>
+              <th className="font-medium py-1 pr-4">Date</th>
+              <th className="font-medium py-1 pr-4">Heure</th>
+              <th className="font-medium py-1 pr-4 text-right">Couverts</th>
+              <th className="font-medium py-1 pr-4">Source</th>
+              <th className="font-medium py-1 pr-4">Type</th>
               <th className="font-medium py-1">Fermée le</th>
             </tr>
           </thead>
           <tbody>
             {closures.items.map((item, i) => (
               <tr key={`${offset + i}`} className="border-t border-gray-50">
-                <td className="py-1.5">{formatDay(item.booking_date)}</td>
-                <td className="py-1.5">{item.booking_time ?? '—'}</td>
-                <td className="py-1.5 text-right">{item.number_of_guests ?? '—'}</td>
-                <td className="py-1.5">{SOURCE_LABELS[item.booking_source ?? ''] ?? item.booking_source ?? '—'}</td>
-                <td className="py-1.5">{RESERVATION_TYPE_LABELS[item.reservation_type ?? ''] ?? item.reservation_type ?? '—'}</td>
+                <td className="py-1.5 pr-4">{formatDay(item.booking_date)}</td>
+                <td className="py-1.5 pr-4">{item.booking_time ?? '—'}</td>
+                <td className="py-1.5 pr-4 text-right">{item.number_of_guests ?? '—'}</td>
+                <td className="py-1.5 pr-4">{SOURCE_LABELS[item.booking_source ?? ''] ?? item.booking_source ?? '—'}</td>
+                <td className="py-1.5 pr-4">{RESERVATION_TYPE_LABELS[item.reservation_type ?? ''] ?? item.reservation_type ?? '—'}</td>
                 <td className="py-1.5 text-gray-500">{formatInstant(item.closed_at)}</td>
               </tr>
             ))}
