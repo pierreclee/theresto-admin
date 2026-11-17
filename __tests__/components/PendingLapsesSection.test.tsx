@@ -51,6 +51,11 @@ describe('PendingLapsesSection', () => {
     expect(screen.getByText('1–1 sur 25')).toBeInTheDocument();
   });
 
+  it('seuils : un espace entre le nombre et « demandes »', () => {
+    render(<PendingLapsesSection restaurantId={RID} />);
+    expect(screen.getByText(/Alerte à partir de/).textContent).toMatch(/Alerte à partir de 5 demandes non confirmées/);
+  });
+
   it('page suivante', () => {
     render(<PendingLapsesSection restaurantId={RID} />);
     fireEvent.click(screen.getByLabelText('Page suivante'));

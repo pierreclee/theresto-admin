@@ -180,7 +180,7 @@ function Summary({ detail }: { detail: PendingLapseDetail }) {
         <Tile label="Taux" value={formatRate(current.rate)} sub={`30 jours précédents : ${formatRate(previous.rate)} (${previous.lapsed} sur ${previous.total})`} />
       </div>
       <p className="text-xs text-gray-500">
-        Alerte à partir de <strong>{settings.pending_lapse_min_count}</strong> demandes non confirmées et d&apos;un taux d&apos;au
+        Alerte à partir de <strong>{settings.pending_lapse_min_count}</strong>{' '}demandes non confirmées et d&apos;un taux d&apos;au
         moins <strong>{formatRate(settings.pending_lapse_min_rate)}</strong> sur 30 jours. Suivi depuis le{' '}
         {formatInstant(settings.pending_lapse_tracking_since, false)}.
         {current.last_lapse_at && <> Dernière demande échue : service fini le {formatInstant(current.last_lapse_at)}.</>}
