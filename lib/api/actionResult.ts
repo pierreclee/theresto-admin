@@ -31,7 +31,18 @@ export function isAuditLogRefusal(error: unknown): boolean {
   return error instanceof Error && error.message === ADMIN_LOG_FAILED_MESSAGE;
 }
 
-/** Politique de relance de React Query : 3 essais comme par défaut, aucun sur un refus de journal. */
+/** Codes d'un refus d'authentification (session absente ou expirée, second facteur à refaire). */
+const AUTH_REFUSAL_CODES = new Set(['unauthenticated', 'permission-denied']);
+
+/** Refus d'authentification : relancer ne ferait que reproduire l'erreur jusqu'à la reconnexion. */
+export function isAuthRefusal(error: unknown): boolean {
+  return error instanceof ActionError && error.code !== undefined && AUTH_REFUSAL_CODES.has(error.code);
+}
+
+/**
+ * Politique de relance de React Query : 3 essais comme par défaut, aucun sur un refus de journal
+ * ni sur un refus d'authentification.
+ */
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
-  return !isAuditLogRefusal(error) && failureCount < 3;
+  return !isAuditLogRefusal(error) && !isAuthRefusal(error) && failureCount < 3;
 }

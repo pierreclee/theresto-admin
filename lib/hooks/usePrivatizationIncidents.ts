@@ -7,6 +7,7 @@ import {
   retryPrivatizationRefundAction,
   returnPrivatizationCustomerBalanceAction,
 } from '@/lib/actions/privatizationIncidents';
+import { ActionError } from '@/lib/api/actionResult';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
 import { formatEuro } from '@/lib/utils/commissionRates';
@@ -25,23 +26,33 @@ export function incidentErrorMessage(code: string | undefined, error: string): s
   return error || "L'action a échoué.";
 }
 
-export function usePrivatizationIncidents(status: PrivatizationIncidentFilter) {
+const SESSION_EXPIRED_MESSAGE = 'Session expirée. Reconnectez-vous puis rechargez la page.';
+
+/**
+ * Liste des incidents. `enabled: false` hors session admin valide (page de connexion, session
+ * expirée) : aucune requête. Un refus d'authentification n'est pas relancé (shouldRetryQuery).
+ */
+export function usePrivatizationIncidents(status: PrivatizationIncidentFilter, { enabled = true }: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['privatizationIncidents', status],
+    enabled,
     queryFn: async () => {
-      // Un échec de l'action serveur elle-même (ex. session admin expirée) arrive en exception.
-      const result = await listPrivatizationIncidentsAction(status).catch((e: unknown) => {
+      // L'action serveur lève quand requireAdmin refuse (session absente ou expirée, second
+      // facteur à refaire) : refus d'authentification, jamais relancé en boucle.
+      let result: Awaited<ReturnType<typeof listPrivatizationIncidentsAction>>;
+      try {
+        result = await listPrivatizationIncidentsAction(status);
+      } catch (e: unknown) {
         console.error('[incidents] lecture impossible', e);
-        return null;
-      });
+        throw new ActionError(SESSION_EXPIRED_MESSAGE, 'unauthenticated');
+      }
       if (!result?.ok) {
         // Liste refusée faute de journal (RGPD-29, D2) : message tel quel.
         if (result?.code === 'audit-log-failed') throw new Error(result.error);
-        throw new Error(
-          result?.code === 'unauthenticated'
-            ? 'Session expirée. Reconnectez-vous puis rechargez la page.'
-            : 'Impossible de charger les incidents.',
-        );
+        if (result?.code === 'unauthenticated' || result?.code === 'permission-denied') {
+          throw new ActionError(SESSION_EXPIRED_MESSAGE, result.code);
+        }
+        throw new Error('Impossible de charger les incidents.');
       }
       return result.data.incidents;
     },
@@ -49,9 +60,9 @@ export function usePrivatizationIncidents(status: PrivatizationIncidentFilter) {
   });
 }
 
-/** Nombre d'incidents ouverts (badge de la barre latérale). */
-export function useOpenIncidentCount(): number {
-  const { data } = usePrivatizationIncidents('open');
+/** Nombre d'incidents ouverts (badge de la barre latérale) ; aucune requête si `enabled` est faux. */
+export function useOpenIncidentCount(enabled: boolean): number {
+  const { data } = usePrivatizationIncidents('open', { enabled });
   return data?.length ?? 0;
 }
 

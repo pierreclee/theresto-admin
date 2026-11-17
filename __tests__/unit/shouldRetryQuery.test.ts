@@ -7,6 +7,12 @@ describe('shouldRetryQuery', () => {
     expect(shouldRetryQuery(0, new Error(ADMIN_LOG_FAILED_MESSAGE))).toBe(false);
   });
 
+  it("ne relance pas un refus d'authentification (session expirée, second facteur)", () => {
+    expect(shouldRetryQuery(0, new ActionError('x', 'unauthenticated'))).toBe(false);
+    expect(shouldRetryQuery(0, new ActionError('x', 'permission-denied'))).toBe(false);
+    expect(shouldRetryQuery(0, new ActionError('x', 'internal'))).toBe(true);
+  });
+
   it("relance les autres erreurs jusqu'à 3 fois", () => {
     expect(shouldRetryQuery(0, new Error('réseau'))).toBe(true);
     expect(shouldRetryQuery(2, new Error('réseau'))).toBe(true);

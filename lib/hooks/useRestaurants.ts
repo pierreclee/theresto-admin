@@ -7,9 +7,13 @@ import { useToast } from '@/components/shared/Toaster';
 import type { UpdateRestaurantInput } from '@/lib/types/restaurant';
 import type { SubscriptionPlanKey } from '@/lib/utils/subscriptionPlan';
 
-export function useRestaurants(filters?: { status?: string | string[]; subscription?: string; search?: string }) {
+export function useRestaurants(
+  filters?: { status?: string | string[]; subscription?: string; search?: string },
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: ['restaurants', filters],
+    enabled,
     queryFn: () => adminApi.getRestaurants(filters),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
