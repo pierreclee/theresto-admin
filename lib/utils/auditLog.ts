@@ -102,6 +102,20 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   reactivate_short_link: 'Lien court réactivé',
   update_short_link_settings: 'Liens des stores modifiés',
   update_app_version_policy: 'Versions de l’app modifiées',
+  view_restaurant_alerts: 'Alertes des restaurants consultées',
+  view_restaurant_pending_lapse_stats: 'Demandes non confirmées consultées (liste)',
+  view_restaurant_pending_lapses: 'Demandes non confirmées consultées',
+  update_restaurant_alert_settings: 'Seuils d’alerte modifiés',
+  view_disputes: 'Litiges consultés',
+  view_restaurant_recharges: 'Refacturations du restaurant consultées',
+  view_incident_commission_refunds: 'Commissions d’incidents non rendues consultées',
+  ontime_reports_viewed: 'Signalements OnTime consultés',
+  ontime_overview_viewed: 'Suivi OnTime du restaurant consulté',
+  ontime_report_decided: 'Contestation OnTime tranchée',
+  ontime_report_voided: 'Manquement OnTime annulé',
+  ontime_withdrawn: 'OnTime retirée',
+  ontime_sanction_lifted: 'Sanction OnTime levée',
+  ontime_sanctions_switch: 'Interrupteur des sanctions OnTime',
 };
 
 export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
@@ -117,6 +131,9 @@ export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
   platform: 'Plateforme',
   link: 'Lien court',
   app_version_policy: 'Versions de l’app',
+  ontime_report: 'Signalement OnTime',
+  ontime_sanction: 'Sanction OnTime',
+  platform_settings: 'Réglages de la plateforme',
 };
 
 function toOptions(labels: Record<string, string>): { value: string; label: string }[] {
@@ -153,6 +170,9 @@ const EURO_KEYS: Record<string, string> = {
 const CODE_KEYS: Record<string, string> = {
   status: 'Statut',
   newStatus: 'Nouveau statut',
+  decision: 'Décision',
+  sanction_kind: 'Sanction',
+  filter: 'Filtre',
   correctionMode: 'Mode',
   oldPlan: 'Ancien plan',
   newPlan: 'Nouveau plan',

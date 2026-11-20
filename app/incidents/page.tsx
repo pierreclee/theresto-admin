@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { PrivatizationIncidentsTable } from '@/components/incidents/PrivatizationIncidentsTable';
+import { IncidentCommissionRefundsSection } from '@/components/incidents/IncidentCommissionRefundsTable';
 import { usePrivatizationIncidents } from '@/lib/hooks/usePrivatizationIncidents';
 import { INCIDENT_FILTERS } from '@/lib/utils/privatizationIncidents';
 import type { PrivatizationIncidentFilter } from '@/lib/types/privatizationIncidents';
@@ -45,6 +46,8 @@ export default function IncidentsPage() {
           )}
         </div>
       </div>
+
+      <IncidentCommissionRefundsSection />
     </div>
   );
 }

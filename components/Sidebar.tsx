@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   QrCode,
   Timer,
+  Scale,
 } from 'lucide-react';
 
 const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
@@ -30,6 +31,7 @@ const routes: { href: string; label: string; icon: React.ElementType; exact?: bo
   { href: '/users', label: 'Utilisateurs', icon: Users },
   { href: '/ontime', label: 'OnTime', icon: Timer },
   { href: '/incidents', label: 'Incidents de paiement', icon: AlertTriangle },
+  { href: '/disputes', label: 'Litiges', icon: Scale },
   { href: '/links', label: 'Liens & QR', icon: QrCode },
   { href: '/monitoring', label: 'Monitoring', icon: Activity },
   { href: '/config', label: 'Configuration', icon: Settings },
