@@ -18,7 +18,7 @@ import { useToast } from '@/components/shared/Toaster';
 import type { OntimeReportFilter } from '@/lib/types/ontime';
 
 /** Exception de l'action serveur elle-même (session expirée…) : message lisible, jamais le brut. */
-function readFailure(fallback: string) {
+function readFailure() {
   return (error: unknown): never => {
     if (error instanceof ActionError) throw error;
     console.error('[ontime] lecture impossible', error);
@@ -30,7 +30,7 @@ export function useOntimeReports(status: OntimeReportFilter, offset: number) {
   return useQuery({
     queryKey: ['ontime', 'reports', status, offset],
     queryFn: () =>
-      unwrapAction(listOntimeReportsAction(status, offset)).catch(readFailure('Impossible de charger les signalements.')),
+      unwrapAction(listOntimeReportsAction(status, offset)).catch(readFailure()),
     staleTime: 30 * 1000,
     placeholderData: keepPreviousData,
   });
@@ -39,7 +39,7 @@ export function useOntimeReports(status: OntimeReportFilter, offset: number) {
 export function useOntimeOverview(restaurantId: string) {
   return useQuery({
     queryKey: ['ontime', 'overview', restaurantId],
-    queryFn: () => unwrapAction(getOntimeOverviewAction(restaurantId)).catch(readFailure('Impossible de charger le suivi OnTime.')),
+    queryFn: () => unwrapAction(getOntimeOverviewAction(restaurantId)).catch(readFailure()),
     enabled: !!restaurantId,
     staleTime: 30 * 1000,
   });
@@ -50,7 +50,7 @@ export function useOntimePendingCount(enabled: boolean): number {
   const { data } = useQuery({
     queryKey: ['ontime', 'pendingCount'],
     enabled,
-    queryFn: () => unwrapAction(getOntimePendingCountAction()).catch(readFailure('Impossible de compter les contestations.')),
+    queryFn: () => unwrapAction(getOntimePendingCountAction()).catch(readFailure()),
     staleTime: 60 * 1000,
   });
   return data ?? 0;
@@ -59,7 +59,7 @@ export function useOntimePendingCount(enabled: boolean): number {
 export function useOntimeSanctionsSwitch() {
   return useQuery({
     queryKey: ['ontime', 'switch'],
-    queryFn: () => unwrapAction(getOntimeSanctionsSwitchAction()).catch(readFailure('Impossible de lire l’interrupteur.')),
+    queryFn: () => unwrapAction(getOntimeSanctionsSwitchAction()).catch(readFailure()),
     staleTime: 30 * 1000,
   });
 }
