@@ -47,7 +47,8 @@ export function OntimeSanctionsCard() {
             </p>
             {data.enabledAt && (
               <p className="text-xs text-gray-400 mt-0.5">
-                Dernier allumage : {formatInstant(data.enabledAt)}. Aucun manquement antérieur ne compte pour une sanction.
+                Dernier allumage : {formatInstant(data.enabledAt)}.
+                {data.enabled && ' Aucun manquement antérieur ne compte pour une sanction.'}
               </p>
             )}
           </div>

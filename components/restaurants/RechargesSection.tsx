@@ -68,7 +68,7 @@ export function RechargesSection({ restaurantId }: { restaurantId: string }) {
                         <td className="py-2 pr-4">{rechargeKindLabel(r.kind)}</td>
                         <td className="py-2 pr-4 text-right whitespace-nowrap">{euro(r.amountHt)}</td>
                         <td className="py-2 pr-4 capitalize">{formatMonth(r.period)}</td>
-                        <td className="py-2">
+                        <td className="py-2 first-letter:uppercase">
                           {r.invoiceStatus
                             ? `${formatMonth(r.invoicePeriod)} · ${INVOICE_STATUS_LABELS[r.invoiceStatus] ?? r.invoiceStatus}`
                             : 'À facturer'}
