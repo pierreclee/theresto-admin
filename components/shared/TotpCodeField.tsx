@@ -14,12 +14,15 @@ export function TotpCodeField({
   onSubmit,
   busy,
   hint = 'Requis pour toute modification de tarif, même si vous êtes déjà connecté.',
+  autoFocus = true,
 }: {
   value: string;
   onChange: (code: string) => void;
   onSubmit: () => void;
   busy?: boolean;
   hint?: string;
+  /** Faux quand un autre champ (motif) est à remplir d'abord. */
+  autoFocus?: boolean;
 }) {
   const id = useId();
   return (
@@ -37,7 +40,7 @@ export function TotpCodeField({
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, ''))}
         onKeyDown={(e) => e.key === 'Enter' && value.length === 6 && !busy && onSubmit()}
-        autoFocus
+        autoFocus={autoFocus}
         readOnly={busy}
         aria-busy={busy || undefined}
         placeholder="000000"

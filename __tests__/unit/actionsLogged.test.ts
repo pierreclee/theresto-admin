@@ -42,6 +42,17 @@ const EXEMPT: Record<string, string> = {
   // invitations.ts
   inviteRestaurantOwnerAction:
     'journalisée par l Edge Function admin-onboarding (create_restaurant_invitation), auditLogged renvoyé',
+  // ontime.ts : les RPC admin_* écrivent elles-mêmes platform_logs, dans la même transaction
+  // que la lecture ou la décision (contrat docs/features/ontime-tracking.md §4)
+  listOntimeReportsAction: 'journalisée par la RPC admin_ontime_reports (ontime_reports_viewed), même transaction',
+  getOntimePendingCountAction: 'un nombre de contestations (badge), aucune donnée personnelle',
+  getOntimeOverviewAction: 'journalisée par la RPC admin_ontime_overview (ontime_overview_viewed), même transaction',
+  getOntimeSanctionsSwitchAction: 'interrupteur des sanctions de la plateforme, non personnel',
+  decideOntimeReportAction: 'journalisée par la RPC admin_decide_ontime_report (ontime_report_decided), même transaction',
+  voidOntimeReportAction: 'journalisée par la RPC admin_void_ontime_report (ontime_report_voided), même transaction',
+  withdrawOntimeAction: 'journalisée par la RPC admin_withdraw_ontime (ontime_withdrawn), même transaction',
+  liftOntimeSanctionAction: 'journalisée par la RPC admin_lift_ontime_sanction (ontime_sanction_lifted), même transaction',
+  setOntimeSanctionsAction: 'journalisée par la RPC admin_set_ontime_sanctions (ontime_sanctions_switch), même transaction',
   // privatizationIncidents.ts
   listPrivatizationIncidentsAction:
     'journalisée par l Edge Function admin-privatization-incidents (list_privatization_incidents), '

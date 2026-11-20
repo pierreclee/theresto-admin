@@ -160,6 +160,50 @@ Contrat : `docs/features/admin-restaurant-alerts.md` du dépôt theresto_app. Se
   tardives » (CGV 6.2, action `setLateDeclarationCommissionRule` de `commission-settings` : code TOTP,
   version `lateDeclarationRule.updatedAt`, journalisée par l'Edge Function).
 
+## OnTime (chantier C, lot C5)
+
+Contrat : `docs/features/ontime-tracking.md` du dépôt theresto_app. Server Actions `lib/actions/ontime.ts`
+(RPC `admin_*`, `service_role`, après `requireAdmin()`, avec l'id et l'e-mail de l'admin de la session).
+
+- **Journal :** chaque RPC écrit elle-même sa ligne de `platform_logs` dans sa transaction
+  (`ontime_reports_viewed`, `ontime_overview_viewed`, `ontime_report_decided`, `ontime_report_voided`,
+  `ontime_withdrawn`, `ontime_sanction_lifted`, `ontime_sanctions_switch`) : pas de `logAdminAction` en plus
+  (entrées `EXEMPT` de `actionsLogged.test.ts`).
+- **Écritures :** code TOTP de moins de 5 minutes (une décision peut suspendre un restaurant), motif de 10 à
+  1 000 caractères (montré au restaurant, jamais au client), version lue : `stale` ou `invalid_state` renvoient
+  la ligne à jour, reprise par la fiche (un nouvel essai part avec la bonne version) ; `not_found`.
+  Interrupteur : version figée à l'ouverture de la modale.
+- **Page `/ontime` :** onglets (À trancher, badge du nombre de contestations aussi dans la barre latérale),
+  fiche d'un signalement (faits de la réservation, commentaire, contestation, issue), Retenir / Écarter, Annuler
+  ce manquement, puis « Lever aussi » si la sanction déclenchée est encore en vigueur (Q4). `?restaurant=<id>`
+  (lien de la fiche) : signalements de ce restaurant seul. Après une décision qui vide la dernière page, retour
+  à la dernière page qui existe.
+- **Fiche d'un restaurant :** section OnTime (état, compteur 30 jours, sanctions, Lever la suspension,
+  Rétablir, Retirer l'OnTime avec case de confirmation ; retrait permis interrupteur éteint).
+- **`/config` :** interrupteur des sanctions automatiques ; l'allumer exige de cocher « les CGV 1.2
+  (article 7.4 bis) sont publiées et en vigueur » (refusé aussi par l'action serveur sans `confirmCgv`).
+
+## Litiges, refacturations et incidents (chantier C, lots C1 à C3)
+
+Contrats : `docs/features/booking-commissions.md` §13 et `docs/features/admin-restaurant-alerts.md` §3.3.
+Server Actions `lib/actions/disputes.ts`, lecture seule, clé service après `requireAdmin()`.
+
+- **Page `/disputes` :** `booking_disputes` et `platform_disputes` (ouverts ou tous ; litiges sans restaurant
+  retrouvé compris), statut, montants, frais, échéance, lien vers le tableau de bord Stripe par l'id
+  (`stripeDashboardUrl`, préfixes `du_`/`dp_`/`re_`/`fee_`/`in_` seulement, `test/` hors mode réel).
+- **Fiche d'un restaurant :** refacturations (`restaurant_recharges` et statut de la facture), reprises
+  (`commission_recharge_recoveries`) et litiges du restaurant ; à leur limite de lecture (200, 50, 100 par
+  table), listes signalées « premières » / « les plus récents ».
+- **Page `/incidents` :** incidents CRM dont la commission à rendre n'est pas rendue (reprise programmée ou
+  abandonnée après 6 essais), liens vers l'application fee et le remboursement. Filtre
+  `refund_commission_failed_at` non nul dans la requête, avant la limite de 500 (liste tronquée signalée).
+- **Données :** ni `booking_id`, ni PaymentIntent, ni charge, ni client ou description d'incident.
+  Consultations journalisées (`view_disputes`, `view_restaurant_recharges`,
+  `view_incident_commission_refunds`) et refusées si le journal échoue.
+- **Alertes :** libellés et détails des types `subscription_*`, `dispute_*`, `recharge_recovery_failed`,
+  `ontime_*` ; « réservations en ligne coupées » seulement si `online_bookings_blocked`, « Litige perdu :
+  refacturé » seulement si `has_recharge`.
+
 ## Key Documentation
 
 - [Deployment Guide](./docs/DEPLOYMENT.md) — Vercel, environment setup, custom domain

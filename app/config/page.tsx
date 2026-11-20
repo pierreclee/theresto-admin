@@ -16,6 +16,7 @@ import { CommissionRatesCard } from '@/components/config/CommissionRatesCard';
 import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 import { AppVersionPoliciesCard } from '@/components/config/AppVersionPoliciesCard';
 import { RestaurantAlertSettingsCard } from '@/components/config/RestaurantAlertSettingsCard';
+import { OntimeSanctionsCard } from '@/components/config/OntimeSanctionsCard';
 
 // ─── Toggle row ───────────────────────────────────────────────────────────────
 
@@ -195,6 +196,9 @@ export default function ConfigPage() {
 
       {/* Seuils d'alerte des demandes non confirmées (restaurant_alert_settings) */}
       <RestaurantAlertSettingsCard />
+
+      {/* Interrupteur des sanctions OnTime automatiques (CGV 1.2, art. 7.4 bis) */}
+      <OntimeSanctionsCard />
 
       {/* Version minimale et recommandée de l'app mobile (Edge Function app-version-settings) */}
       <AppVersionPoliciesCard />

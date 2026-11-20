@@ -35,6 +35,8 @@ import { CommissionSection } from './CommissionSection';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { BillingSection } from './BillingSection';
 import { PendingLapsesSection, RestaurantAlertsBox } from './PendingLapsesSection';
+import { OntimeSection } from './OntimeSection';
+import { RechargesSection } from './RechargesSection';
 import { SubscriptionModal } from './SubscriptionModal';
 import { ApprovalModal } from './ApprovalModal';
 import { EditRestaurantModal } from './EditRestaurantModal';
@@ -499,8 +501,14 @@ export function RestaurantDetail({ restaurant }: Props) {
         {/* Commissions de réservation (plan Essentiel) */}
         <CommissionSection restaurantId={restaurant.id} />
 
+        {/* Refacturations, reprises et litiges (chantier C) */}
+        <RechargesSection restaurantId={restaurant.id} />
+
         {/* Demandes non confirmées à la fin du service (30 jours, 12 semaines) */}
         <PendingLapsesSection restaurantId={restaurant.id} />
+
+        {/* OnTime : état, compteur, sanctions, signalements (CGV 7.4 bis) */}
+        <OntimeSection restaurantId={restaurant.id} />
 
         {/* Informations techniques */}
         <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

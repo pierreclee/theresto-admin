@@ -1,7 +1,7 @@
 'use client';
 
 import type { RestaurantAlert } from '@/lib/types/restaurantAlerts';
-import { alertKindLabel, severityClasses } from '@/lib/utils/restaurantAlerts';
+import { alertLabel, severityClasses } from '@/lib/utils/restaurantAlerts';
 
 /**
  * Badge rouge seul (un point, sans texte) d'un restaurant en alerte. Les types sont dits
@@ -9,7 +9,7 @@ import { alertKindLabel, severityClasses } from '@/lib/utils/restaurantAlerts';
  */
 export function RestaurantAlertDot({ alerts }: { alerts: RestaurantAlert[] | undefined }) {
   if (!alerts || alerts.length === 0) return null;
-  const labels = [...new Set(alerts.map((a) => alertKindLabel(a.kind)))].join(', ');
+  const labels = [...new Set(alerts.map((a) => alertLabel(a)))].join(', ');
   return (
     <span
       role="img"
@@ -26,7 +26,7 @@ export function AlertKindPill({ alert }: { alert: RestaurantAlert }) {
     <span
       className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${severityClasses(alert.severity)}`}
     >
-      {alertKindLabel(alert.kind)}
+      {alertLabel(alert)}
     </span>
   );
 }
