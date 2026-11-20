@@ -8,6 +8,7 @@ import { Sidebar } from '@/components/Sidebar';
 const auth = { adminUser: null, signOut: jest.fn(), isAdmin: true, sessionValid: true };
 let pathname = '/';
 const openIncidentCount = jest.fn<number, [boolean]>(() => 0);
+const ontimePendingCount = jest.fn<number, [boolean]>(() => 0);
 const restaurants = jest.fn<{ data: undefined }, [unknown, { enabled?: boolean } | undefined]>(() => ({ data: undefined }));
 
 jest.mock('next/navigation', () => ({ usePathname: () => pathname, useRouter: () => ({ push: jest.fn() }) }));
@@ -22,9 +23,13 @@ jest.mock('@/lib/hooks/useRestaurants', () => ({
 jest.mock('@/lib/hooks/usePrivatizationIncidents', () => ({
   useOpenIncidentCount: (e: boolean) => openIncidentCount(e),
 }));
+jest.mock('@/lib/hooks/useOntime', () => ({
+  useOntimePendingCount: (e: boolean) => ontimePendingCount(e),
+}));
 
 beforeEach(() => {
   openIncidentCount.mockClear();
+  ontimePendingCount.mockClear();
   restaurants.mockClear();
   Object.assign(auth, { isAdmin: true, sessionValid: true });
 });
@@ -34,6 +39,7 @@ describe('Sidebar : badges et session', () => {
     pathname = '/auth/login';
     render(<Sidebar />);
     expect(openIncidentCount).toHaveBeenLastCalledWith(false);
+    expect(ontimePendingCount).toHaveBeenLastCalledWith(false);
     expect(restaurants.mock.calls.at(-1)?.[1]).toEqual({ enabled: false });
   });
 
@@ -42,6 +48,7 @@ describe('Sidebar : badges et session', () => {
     auth.sessionValid = false;
     render(<Sidebar />);
     expect(openIncidentCount).toHaveBeenLastCalledWith(false);
+    expect(ontimePendingCount).toHaveBeenLastCalledWith(false);
     expect(restaurants.mock.calls.at(-1)?.[1]).toEqual({ enabled: false });
   });
 
@@ -50,12 +57,14 @@ describe('Sidebar : badges et session', () => {
     auth.isAdmin = false;
     render(<Sidebar />);
     expect(openIncidentCount).toHaveBeenLastCalledWith(false);
+    expect(ontimePendingCount).toHaveBeenLastCalledWith(false);
   });
 
   it('session valide : badges chargés', () => {
     pathname = '/';
     render(<Sidebar />);
     expect(openIncidentCount).toHaveBeenLastCalledWith(true);
+    expect(ontimePendingCount).toHaveBeenLastCalledWith(true);
     expect(restaurants.mock.calls.at(-1)?.[1]).toEqual({ enabled: true });
   });
 });
