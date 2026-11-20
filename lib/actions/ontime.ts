@@ -18,7 +18,7 @@
 import { createClient, getAdminClient, requireAdmin } from '@/lib/supabase/server';
 import type { ActionResult } from '@/lib/supabase/invokeFunction';
 import { hasRecentTotp, MFA_REQUIRED_CODE, RECENT_MFA_REQUIRED_MESSAGE } from '@/lib/utils/recentMfa';
-import { ONTIME_PAGE_SIZE, ontimeStatusMessage, reasonError } from '@/lib/utils/ontime';
+import { ONTIME_PAGE_SIZE, ontimeRefreshedMessage, ontimeStatusMessage, reasonError } from '@/lib/utils/ontime';
 import type {
   OntimeDecisionResult,
   OntimeOverview,
@@ -28,6 +28,7 @@ import type {
   OntimeSanction,
   OntimeSanctionsSwitch,
   OntimeVoidResult,
+  OntimeWriteResult,
 } from '@/lib/types/ontime';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -40,13 +41,34 @@ type RpcJson = { status?: string } & Record<string, unknown>;
 function dbFailure(error: DbError, fallback: string): Failure {
   // Code seulement : jamais le message brut (en anglais, parfois avec des valeurs).
   console.error('[ontime] refus de la base :', error?.code ?? 'erreur');
-  if (error?.code === '22023') return { ok: false, code: 'invalid-argument', error: 'Valeurs invalides (motif de 10 à 1 000 caractères).' };
+  if (error?.code === '22023') {
+    // Le message de la base (lu, jamais renvoyé) dit si le refus porte sur le motif.
+    const aboutReason = /motif/i.test(error.message ?? '');
+    return {
+      ok: false,
+      code: 'invalid-argument',
+      error: aboutReason ? 'Motif invalide : 10 à 1 000 caractères.' : 'Valeurs invalides. Rechargez la page puis réessayez.',
+    };
+  }
   return { ok: false, code: error?.code ?? 'internal', error: fallback };
 }
 
 function statusFailure(status: string | undefined): Failure {
   const code = status === 'stale' ? 'conflict' : status === 'not_found' ? 'not-found' : status === 'invalid_state' ? 'invalid-state' : 'internal';
   return { ok: false, code, error: ontimeStatusMessage(status ?? '') };
+}
+
+/** Refus d'une écriture, avec la ligne à jour renvoyée par la RPC (stale, invalid_state). */
+function writeFailure(json: RpcJson): Failure & { report?: OntimeReport; sanction?: OntimeSanction } {
+  const failure = statusFailure(json.status);
+  if (json.status !== 'stale' && json.status !== 'invalid_state') return failure;
+  if (!(json.report && typeof json.report === 'object') && !(json.sanction && typeof json.sanction === 'object')) return failure;
+  return {
+    ...failure,
+    error: ontimeRefreshedMessage(json.status),
+    ...(json.report && typeof json.report === 'object' ? { report: pickReport(json.report) } : {}),
+    ...(json.sanction && typeof json.sanction === 'object' ? { sanction: pickSanction(json.sanction) } : {}),
+  };
 }
 
 const notFound = (): Failure => ({ ok: false, code: 'not-found', error: 'Introuvable.' });
@@ -231,7 +253,7 @@ export async function decideOntimeReportAction(input: {
   decision: 'upheld' | 'dismissed';
   reason: string;
   expectedUpdatedAt: string;
-}): Promise<ActionResult<OntimeDecisionResult>> {
+}): Promise<OntimeWriteResult<OntimeDecisionResult>> {
   const admin = await requireAdmin();
   const refusal = await recentTotpRefusal();
   if (refusal) return refusal;
@@ -254,7 +276,7 @@ export async function decideOntimeReportAction(input: {
   });
   if (error) return dbFailure(error, 'Décision impossible.');
   const json = (data ?? {}) as RpcJson;
-  if (json.status !== 'ok') return statusFailure(json.status);
+  if (json.status !== 'ok') return writeFailure(json);
   return { ok: true, data: { report: pickReport(json.report), sanction: optionalSanction(json.sanction) } };
 }
 
@@ -263,7 +285,7 @@ export async function voidOntimeReportAction(input: {
   reportId: string;
   reason: string;
   expectedUpdatedAt: string;
-}): Promise<ActionResult<OntimeVoidResult>> {
+}): Promise<OntimeWriteResult<OntimeVoidResult>> {
   const admin = await requireAdmin();
   const refusal = await recentTotpRefusal();
   if (refusal) return refusal;
@@ -282,7 +304,7 @@ export async function voidOntimeReportAction(input: {
   });
   if (error) return dbFailure(error, 'Annulation impossible.');
   const json = (data ?? {}) as RpcJson;
-  if (json.status !== 'ok') return statusFailure(json.status);
+  if (json.status !== 'ok') return writeFailure(json);
   return { ok: true, data: { report: pickReport(json.report), triggeredSanction: optionalSanction(json.triggered_sanction) } };
 }
 
@@ -316,7 +338,7 @@ export async function liftOntimeSanctionAction(input: {
   sanctionId: string;
   reason: string;
   expectedUpdatedAt: string;
-}): Promise<ActionResult<{ sanction: OntimeSanction }>> {
+}): Promise<OntimeWriteResult<{ sanction: OntimeSanction }>> {
   const admin = await requireAdmin();
   const refusal = await recentTotpRefusal();
   if (refusal) return refusal;
@@ -335,7 +357,7 @@ export async function liftOntimeSanctionAction(input: {
   });
   if (error) return dbFailure(error, 'Levée impossible.');
   const json = (data ?? {}) as RpcJson;
-  if (json.status !== 'ok') return statusFailure(json.status);
+  if (json.status !== 'ok') return writeFailure(json);
   return { ok: true, data: { sanction: pickSanction(json.sanction) } };
 }
 

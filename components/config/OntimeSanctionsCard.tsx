@@ -16,8 +16,9 @@ import { formatInstant } from '@/lib/utils/restaurantAlerts';
 export function OntimeSanctionsCard() {
   const { data, isPending, error } = useOntimeSanctionsSwitch();
   const setSwitch = useSetOntimeSanctions();
-  // Valeur visée, figée à l'ouverture : après un conflit, l'état rechargé ne retourne pas l'action.
-  const [target, setTarget] = useState<boolean | null>(null);
+  // Valeur visée et version lue, figées à l'ouverture : après un conflit, l'état rechargé ne
+  // retourne pas l'action et n'envoie pas en silence une version que l'admin n'a pas vue.
+  const [target, setTarget] = useState<{ enabled: boolean; expectedUpdatedAt: string | null } | null>(null);
 
   return (
     <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -53,7 +54,7 @@ export function OntimeSanctionsCard() {
             )}
           </div>
           <button
-            onClick={() => setTarget(!data.enabled)}
+            onClick={() => setTarget({ enabled: !data.enabled, expectedUpdatedAt: data.updatedAt })}
             className="px-3 py-1.5 text-xs font-medium text-gray-600 border border-gray-200 bg-white rounded-lg hover:text-[#FF6B35] hover:border-[#FF6B35]/30 hover:bg-orange-50 transition-colors flex-shrink-0"
           >
             {data.enabled ? 'Éteindre' : 'Allumer'}
@@ -61,22 +62,22 @@ export function OntimeSanctionsCard() {
         </div>
       )}
 
-      {target !== null && data && (
+      {target !== null && (
         <OntimeActionModal
-          title={target ? 'Allumer les sanctions OnTime' : 'Éteindre les sanctions OnTime'}
+          title={target.enabled ? 'Allumer les sanctions OnTime' : 'Éteindre les sanctions OnTime'}
           warning={
-            target
+            target.enabled
               ? 'Les CGV 1.2 (article 7.4 bis) doivent être publiées et en vigueur avant d’allumer. Seuls les manquements retenus après l’allumage compteront ; aucune sanction rétroactive.'
               : 'Plus aucun avertissement ni aucune suspension automatique. Les sanctions en cours ne sont pas levées (levée par restaurant, dans sa fiche).'
           }
-          confirmation={target ? 'Je confirme que les CGV 1.2 (article 7.4 bis) sont publiées et en vigueur.' : undefined}
-          confirmLabel={target ? 'Allumer' : 'Éteindre'}
-          danger={target}
+          confirmation={target.enabled ? 'Je confirme que les CGV 1.2 (article 7.4 bis) sont publiées et en vigueur.' : undefined}
+          confirmLabel={target.enabled ? 'Allumer' : 'Éteindre'}
+          danger={target.enabled}
           onConfirm={async (_reason, totpCode) => {
             await setSwitch.mutateAsync({
-              enabled: target,
-              expectedUpdatedAt: data.updatedAt,
-              confirmCgv: target,
+              enabled: target.enabled,
+              expectedUpdatedAt: target.expectedUpdatedAt,
+              confirmCgv: target.enabled,
               totpCode,
             });
           }}

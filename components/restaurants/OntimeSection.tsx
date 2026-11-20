@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import NextLink from 'next/link';
 import { AlertTriangle, Timer } from 'lucide-react';
 import { OntimeActionModal } from '@/components/ontime/OntimeActionModal';
 import { OntimeReportDialog, OntimeStatusPill } from '@/components/ontime/OntimeReportDialog';
-import { useLiftOntimeSanction, useOntimeOverview, useWithdrawOntime } from '@/lib/hooks/useOntime';
+import { OntimeWriteError, useLiftOntimeSanction, useOntimeOverview, useWithdrawOntime } from '@/lib/hooks/useOntime';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { formatInstant, formatRate } from '@/lib/utils/restaurantAlerts';
 import { delayCategoryLabel, isSanctionActive, sanctionKindLabel } from '@/lib/utils/ontime';
@@ -146,9 +147,12 @@ export function OntimeSection({ restaurantId }: { restaurantId: string }) {
                 ))}
               </ul>
             )}
-            {data.reports.length > REPORTS_SHOWN && (
+            {data.reports.length > 0 && (
               <p className="text-xs text-gray-400 mt-2">
-                {REPORTS_SHOWN} signalements affichés sur {data.reports.length} (les plus récents) ; la page OnTime les liste tous.
+                {data.reports.length > REPORTS_SHOWN && `${REPORTS_SHOWN} signalements affichés sur ${data.reports.length} (les plus récents). `}
+                <NextLink href={`/ontime?restaurant=${restaurantId}`} className="text-[#FF6B35] hover:underline">
+                  Tous ses signalements dans la page OnTime
+                </NextLink>
               </p>
             )}
           </div>
@@ -192,6 +196,10 @@ export function OntimeSection({ restaurantId }: { restaurantId: string }) {
               reason,
               expectedUpdatedAt: pending.sanction.updated_at,
               totpCode,
+            }).catch((error: unknown) => {
+              // Sanction à jour (conflit, déjà levée) : un nouvel essai part avec sa version.
+              if (error instanceof OntimeWriteError && error.sanction) setPending({ kind: 'lift', sanction: error.sanction });
+              throw error;
             });
           }}
           onClose={() => setPending(null)}

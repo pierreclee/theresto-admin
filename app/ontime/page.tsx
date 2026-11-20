@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import NextLink from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { AlertTriangle } from 'lucide-react';
 import { OntimeReportDialog, OntimeStatusPill } from '@/components/ontime/OntimeReportDialog';
 import { useOntimePendingCount, useOntimeReports } from '@/lib/hooks/useOntime';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { formatInstant } from '@/lib/utils/restaurantAlerts';
-import { delayCategoryLabel, formatRemaining, ONTIME_FILTERS, ONTIME_PAGE_SIZE } from '@/lib/utils/ontime';
+import { delayCategoryLabel, formatRemaining, lastPageOffset, ONTIME_FILTERS, ONTIME_PAGE_SIZE } from '@/lib/utils/ontime';
 import type { OntimeReport, OntimeReportFilter } from '@/lib/types/ontime';
 
 /** Colonne « Contestation / échéance » selon le statut. */
@@ -20,14 +21,37 @@ function contestCell(report: OntimeReport): string {
   return '—';
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `?restaurant=<id>` (lien de la fiche d'un restaurant) : signalements de ce restaurant seul. */
 export default function OntimePage() {
-  const [filter, setFilter] = useState<OntimeReportFilter>('contested');
+  return (
+    <Suspense fallback={<p className="text-sm text-gray-400 py-8 text-center">Chargement…</p>}>
+      <OntimeReports />
+    </Suspense>
+  );
+}
+
+function OntimeReports() {
+  const param = useSearchParams().get('restaurant');
+  const restaurantId = param && UUID.test(param) ? param.toLowerCase() : null;
+  return <OntimeReportsList key={restaurantId ?? 'all'} restaurantId={restaurantId} />;
+}
+
+function OntimeReportsList({ restaurantId }: { restaurantId: string | null }) {
+  // Un restaurant : tous ses signalements d'abord ; sinon les contestations à trancher.
+  const [filter, setFilter] = useState<OntimeReportFilter>(restaurantId ? 'all' : 'contested');
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<OntimeReport | null>(null);
   const { isAdmin, sessionValid } = useAuth();
   const pendingCount = useOntimePendingCount(isAdmin && sessionValid);
-  const { data, isPending, error, isFetching } = useOntimeReports(filter, offset);
+  const { data, isPending, error, isFetching, isPlaceholderData } = useOntimeReports(filter, offset, restaurantId);
   const total = data?.total ?? 0;
+
+  // Page devenue vide (décision sur le dernier signalement de la dernière page, liste raccourcie
+  // ailleurs) : retour à la dernière page qui existe (mise à jour pendant le rendu, sans effet).
+  const lastOffset = data && !isPlaceholderData ? lastPageOffset(data.total, offset) : offset;
+  if (lastOffset !== offset) setOffset(lastOffset);
 
   return (
     <div className="space-y-5">
@@ -37,6 +61,16 @@ export default function OntimePage() {
           Signalements « servi en retard » des précommandes OnTime (CGV 7.4 bis) : TheResto tranche les contestations
           des restaurants. Données de la réservation seulement, jamais l&apos;identité du client.
         </p>
+        {restaurantId && (
+          <p className="text-sm text-gray-700 mt-2" data-testid="ontime-restaurant-filter">
+            Signalements de{' '}
+            <NextLink href={`/restaurants/${restaurantId}`} className="text-[#FF6B35] hover:underline">
+              {data?.reports[0]?.restaurant_name || 'ce restaurant'}
+            </NextLink>
+            {' · '}
+            <NextLink href="/ontime" className="text-gray-500 hover:underline">Tous les restaurants</NextLink>
+          </p>
+        )}
       </div>
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
@@ -52,7 +86,7 @@ export default function OntimePage() {
               }`}
             >
               {f.label}
-              {f.value === 'contested' && pendingCount > 0 && (
+              {f.value === 'contested' && !restaurantId && pendingCount > 0 && (
                 <span
                   aria-label={`${pendingCount} à trancher`}
                   className="px-1.5 py-0.5 text-[10px] font-bold bg-red-500 text-white rounded-full"
@@ -122,14 +156,14 @@ export default function OntimePage() {
             </span>
             <div className="flex gap-2">
               <button
-                disabled={offset === 0}
+                disabled={offset === 0 || isPlaceholderData}
                 onClick={() => setOffset(Math.max(0, offset - ONTIME_PAGE_SIZE))}
                 className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40"
               >
                 Précédent
               </button>
               <button
-                disabled={offset + ONTIME_PAGE_SIZE >= total}
+                disabled={offset + ONTIME_PAGE_SIZE >= total || isPlaceholderData}
                 onClick={() => setOffset(offset + ONTIME_PAGE_SIZE)}
                 className="px-3 py-1.5 border border-gray-200 rounded-lg disabled:opacity-40"
               >

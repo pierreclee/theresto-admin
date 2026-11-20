@@ -4,7 +4,7 @@ import { useState } from 'react';
 import NextLink from 'next/link';
 import { X } from 'lucide-react';
 import { OntimeActionModal } from '@/components/ontime/OntimeActionModal';
-import { useDecideOntimeReport, useLiftOntimeSanction, useVoidOntimeReport } from '@/lib/hooks/useOntime';
+import { OntimeWriteError, useDecideOntimeReport, useLiftOntimeSanction, useVoidOntimeReport } from '@/lib/hooks/useOntime';
 import { formatInstant } from '@/lib/utils/restaurantAlerts';
 import {
   bookingFactsSummary,
@@ -140,6 +140,18 @@ export function OntimeReportDialog({
   const [current, setCurrent] = useState(report);
   const [toLift, setToLift] = useState<OntimeSanction | null>(null);
 
+  /** Refus avec la ligne à jour (conflit, état changé) : la fiche la reprend, puis l'erreur s'affiche. */
+  const refreshFrom = (error: unknown): never => {
+    if (error instanceof OntimeWriteError) {
+      if (error.report) setCurrent({ ...error.report, restaurant_name: current.restaurant_name });
+      if (error.sanction) {
+        setToLift(error.sanction);
+        setPending((p) => (p?.kind === 'lift' ? { kind: 'lift', sanction: error.sanction! } : p));
+      }
+    }
+    throw error;
+  };
+
   return (
     <>
       <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
@@ -240,7 +252,7 @@ export function OntimeReportDialog({
               reason,
               expectedUpdatedAt: current.updated_at,
               totpCode,
-            });
+            }).catch(refreshFrom);
             setCurrent({ ...data.report, restaurant_name: current.restaurant_name });
           }}
           onClose={() => setPending(null)}
@@ -260,7 +272,7 @@ export function OntimeReportDialog({
               reason,
               expectedUpdatedAt: current.updated_at,
               totpCode,
-            });
+            }).catch(refreshFrom);
             setCurrent({ ...data.report, restaurant_name: current.restaurant_name });
             setToLift(data.triggeredSanction);
           }}
@@ -280,7 +292,7 @@ export function OntimeReportDialog({
               reason,
               expectedUpdatedAt: pending.sanction.updated_at,
               totpCode,
-            });
+            }).catch(refreshFrom);
             setToLift(null);
           }}
           onClose={() => setPending(null)}

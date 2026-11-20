@@ -122,3 +122,12 @@ export interface OntimeVoidResult {
   /** Sanction déclenchée par ce manquement (non levée : Q4), à proposer à la levée. */
   triggeredSanction: OntimeSanction | null;
 }
+
+/**
+ * Résultat d'une écriture OnTime. Un refus `conflict` (stale) ou `invalid-state` porte la ligne
+ * telle qu'elle est en base (signalement ou sanction) : l'écran se met à jour, et un nouvel essai
+ * part avec la bonne version.
+ */
+export type OntimeWriteResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; code?: string; error: string; report?: OntimeReport; sanction?: OntimeSanction };

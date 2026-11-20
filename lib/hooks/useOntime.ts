@@ -14,8 +14,17 @@ import {
 } from '@/lib/actions/ontime';
 import { ActionError, unwrapAction } from '@/lib/api/actionResult';
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
+import { samePagedList } from '@/lib/utils/ontime';
 import { useToast } from '@/components/shared/Toaster';
-import type { OntimeReportFilter } from '@/lib/types/ontime';
+import type { OntimeReport, OntimeReportFilter, OntimeSanction, OntimeWriteResult } from '@/lib/types/ontime';
+
+/** Refus d'une écriture OnTime ; `report` / `sanction` : la ligne à jour (conflit, état changé). */
+export class OntimeWriteError extends ActionError {
+  constructor(message: string, code?: string, readonly report?: OntimeReport, readonly sanction?: OntimeSanction) {
+    super(message, code);
+    this.name = 'OntimeWriteError';
+  }
+}
 
 /** Exception de l'action serveur elle-même (session expirée…) : message lisible, jamais le brut. */
 function readFailure() {
@@ -26,13 +35,16 @@ function readFailure() {
   };
 }
 
-export function useOntimeReports(status: OntimeReportFilter, offset: number) {
+export function useOntimeReports(status: OntimeReportFilter, offset: number, restaurantId: string | null = null) {
   return useQuery({
-    queryKey: ['ontime', 'reports', status, offset],
+    queryKey: ['ontime', 'reports', status, restaurantId, offset],
     queryFn: () =>
-      unwrapAction(listOntimeReportsAction(status, offset)).catch(readFailure()),
+      unwrapAction(listOntimeReportsAction(status, offset, restaurantId)).catch(readFailure()),
     staleTime: 30 * 1000,
-    placeholderData: keepPreviousData,
+    // Page précédente gardée seulement pendant un changement de page du même filtre : jamais
+    // les signalements d'un autre onglet ou d'un autre restaurant sous le filtre choisi.
+    placeholderData: (previous, previousQuery) =>
+      previousQuery && samePagedList(previousQuery.queryKey, status, restaurantId) ? keepPreviousData(previous) : undefined,
   });
 }
 
@@ -70,7 +82,7 @@ export function useOntimeSanctionsSwitch() {
  * et les alertes sont rechargées ensuite, même en cas d'erreur (un conflit = écran périmé).
  */
 function useOntimeMutation<I, R>(
-  run: (input: I) => Promise<{ ok: true; data: R } | { ok: false; code?: string; error: string }>,
+  run: (input: I) => Promise<OntimeWriteResult<R>>,
   success: (data: R, input: I) => string,
 ) {
   const toast = useToast();
@@ -78,11 +90,11 @@ function useOntimeMutation<I, R>(
   return useMutation({
     mutationFn: async ({ totpCode, ...input }: I & { totpCode: string }) => {
       await verifyTotpCode(totpCode);
-      const result = await run(input as unknown as I).catch((error: unknown) => {
+      const result: OntimeWriteResult<R> = await run(input as unknown as I).catch((error: unknown) => {
         console.error('[ontime] écriture impossible', error);
         return { ok: false as const, code: 'internal', error: "L'action a échoué. Rechargez la page puis réessayez." };
       });
-      if (!result.ok) throw new ActionError(result.error, result.code);
+      if (!result.ok) throw new OntimeWriteError(result.error, result.code, result.report, result.sanction);
       return result.data;
     },
     onSuccess: (data, input) => toast(success(data, input as unknown as I)),

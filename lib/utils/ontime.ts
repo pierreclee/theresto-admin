@@ -148,5 +148,26 @@ export function ontimeStatusMessage(status: string): string {
   }
 }
 
+/** Message d'un refus stale / invalid_state dont la ligne à jour a été reprise à l'écran. */
+export function ontimeRefreshedMessage(status: string): string {
+  return status === 'invalid_state'
+    ? "Action impossible dans l'état actuel : la fiche affiche maintenant son état à jour."
+    : 'Modifié entre-temps : la fiche affiche maintenant son état à jour. Vérifiez-le avant de recommencer.';
+}
+
 /** Signalements par page de la liste (la RPC accepte 1 à 200). */
 export const ONTIME_PAGE_SIZE = 50;
+
+/**
+ * Début de la dernière page qui existe si [offset] la dépasse (liste raccourcie : décision sur le
+ * dernier signalement de la dernière page) ; sinon [offset] tel quel.
+ */
+export function lastPageOffset(total: number, offset: number, pageSize: number = ONTIME_PAGE_SIZE): number {
+  if (offset < total || offset === 0) return offset;
+  return Math.max(0, Math.floor((total - 1) / pageSize) * pageSize);
+}
+
+/** Clé de requête de la liste (['ontime', 'reports', filtre, restaurant, offset]) : même filtre et même restaurant. */
+export function samePagedList(previousKey: readonly unknown[], status: OntimeReportFilter, restaurantId: string | null): boolean {
+  return previousKey[2] === status && previousKey[3] === restaurantId;
+}

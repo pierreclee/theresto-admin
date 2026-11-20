@@ -1,5 +1,13 @@
-import { formatCents, stripeDashboardUrl } from '@/lib/utils/disputes';
-import { bookingFactsSummary, formatRemaining, isSanctionActive, ontimeStatusLabel, reasonError } from '@/lib/utils/ontime';
+import { countLabel, formatCents, stripeDashboardUrl } from '@/lib/utils/disputes';
+import {
+  bookingFactsSummary,
+  formatRemaining,
+  isSanctionActive,
+  lastPageOffset,
+  ontimeStatusLabel,
+  reasonError,
+  samePagedList,
+} from '@/lib/utils/ontime';
 import type { OntimeSanction } from '@/lib/types/ontime';
 
 describe('liens Stripe', () => {
@@ -52,5 +60,31 @@ describe('OnTime', () => {
     expect(formatRemaining(0)).toBe('échue');
     expect(formatRemaining(26 * 3600)).toBe('1 j 2 h');
     expect(formatRemaining(90)).toBe('1 min');
+  });
+});
+
+describe('listes et pagination', () => {
+  it('nombre d’une liste tronquée', () => {
+    expect(countLabel(12, false)).toBe('(12)');
+    expect(countLabel(200, true)).toBe('(200 premières)');
+  });
+
+  it.each([
+    [120, 100, 100],
+    [100, 100, 50],
+    [51, 100, 50],
+    [50, 50, 0],
+    [0, 50, 0],
+    [0, 0, 0],
+    [10, 0, 0],
+  ])('total %p, offset %p → %p', (total, offset, expected) => {
+    expect(lastPageOffset(total, offset, 50)).toBe(expected);
+  });
+
+  it('données précédentes gardées seulement pour une autre page de la même liste', () => {
+    const key = ['ontime', 'reports', 'contested', null, 50];
+    expect(samePagedList(key, 'contested', null)).toBe(true);
+    expect(samePagedList(key, 'all', null)).toBe(false);
+    expect(samePagedList(key, 'contested', '11111111-2222-4333-8444-555555555555')).toBe(false);
   });
 });
