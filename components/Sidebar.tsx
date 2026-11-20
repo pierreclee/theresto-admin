@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useRestaurants } from '@/lib/hooks/useRestaurants';
 import { TO_REVIEW_STATUSES } from '@/lib/constants/approval';
 import { useOpenIncidentCount } from '@/lib/hooks/usePrivatizationIncidents';
+import { useOntimePendingCount } from '@/lib/hooks/useOntime';
 import {
   LayoutDashboard,
   Store,
@@ -19,6 +20,7 @@ import {
   Clock,
   AlertTriangle,
   QrCode,
+  Timer,
 } from 'lucide-react';
 
 const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
@@ -26,6 +28,7 @@ const routes: { href: string; label: string; icon: React.ElementType; exact?: bo
   { href: '/approvals', label: 'Approbations', icon: Clock, badge: true },
   { href: '/restaurants', label: 'Restaurants', icon: Store },
   { href: '/users', label: 'Utilisateurs', icon: Users },
+  { href: '/ontime', label: 'OnTime', icon: Timer },
   { href: '/incidents', label: 'Incidents de paiement', icon: AlertTriangle },
   { href: '/links', label: 'Liens & QR', icon: QrCode },
   { href: '/monitoring', label: 'Monitoring', icon: Activity },
@@ -43,6 +46,7 @@ export function Sidebar() {
   const badgesEnabled = !pathname.startsWith('/auth/') && isAdmin && sessionValid;
   const { data: pendingData } = useRestaurants({ status: TO_REVIEW_STATUSES }, { enabled: badgesEnabled });
   const openIncidentCount = useOpenIncidentCount(badgesEnabled);
+  const ontimePendingCount = useOntimePendingCount(badgesEnabled);
 
   if (pathname.startsWith('/auth/')) return null;
 
@@ -85,7 +89,9 @@ export function Sidebar() {
               ? (pendingData?.total ?? 0)
               : route.href === '/incidents'
                 ? openIncidentCount
-                : 0;
+                : route.href === '/ontime'
+                  ? ontimePendingCount
+                  : 0;
 
           return (
             <Link
