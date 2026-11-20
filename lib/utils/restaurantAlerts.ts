@@ -10,7 +10,7 @@ export const ALERT_KIND_LABELS: Record<string, string> = {
   subscription_past_due: 'Prélèvement de l’abonnement en échec',
   subscription_unpaid: 'Abonnement impayé : repassé en Essentiel',
   dispute_open: 'Litige ouvert sur un paiement',
-  dispute_lost: 'Litige perdu : refacturé',
+  dispute_lost: 'Litige perdu',
   dispute_reversed_after_billing: 'Litige renversé après facturation : avoir à faire',
   dispute_other_open: 'Litige hors réservation',
   recharge_recovery_failed: 'Reprise des refacturations en échec',
@@ -33,6 +33,11 @@ export function alertKindLabel(kind: string): string {
 export function alertLabel(alert: { kind: string; metrics?: Record<string, unknown> | null }): string {
   if (alert.kind === 'commission_billing_suspended' && alert.metrics?.online_bookings_blocked === true) {
     return 'Commissions impayées : réservations en ligne coupées';
+  }
+  // « refacturé » seulement si la base l'indique (has_recharge, comme record_booking_dispute) :
+  // un litige perdu n'est pas toujours refacturé (refacturation retirée, litige hors facture…).
+  if (alert.kind === 'dispute_lost' && (alert.metrics?.has_recharge === true || alert.metrics?.recharged === true)) {
+    return 'Litige perdu : refacturé';
   }
   return alertKindLabel(alert.kind);
 }

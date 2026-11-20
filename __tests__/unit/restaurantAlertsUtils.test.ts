@@ -78,6 +78,13 @@ describe('types du chantier C', () => {
     expect(alertDetail(open)).toMatch(/formule Croissance, réservations en ligne ouvertes/);
   });
 
+  it('litige perdu : « refacturé » seulement si la base l’indique', () => {
+    expect(alertLabel({ kind: 'dispute_lost', metrics: { lost_disputes_30d: 1, amount_cents: 4590 } })).toBe('Litige perdu');
+    expect(alertLabel({ kind: 'dispute_lost', metrics: null })).toBe('Litige perdu');
+    expect(alertLabel({ kind: 'dispute_lost', metrics: { lost_disputes_30d: 1, has_recharge: false } })).toBe('Litige perdu');
+    expect(alertLabel({ kind: 'dispute_lost', metrics: { lost_disputes_30d: 1, has_recharge: true } })).toBe('Litige perdu : refacturé');
+  });
+
   it('détails chiffrés (montants en centimes pour les litiges)', () => {
     expect(alertDetail({ kind: 'dispute_lost', metrics: { lost_disputes_30d: 1, amount_cents: 4590, fee_cents: 1500 } }))
       .toMatch(/^1 litige\(s\) perdu\(s\) en 30 jours, 45,90\s€ \+ 15,00\s€ de frais$/);
