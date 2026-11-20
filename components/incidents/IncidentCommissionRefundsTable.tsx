@@ -6,7 +6,7 @@ import { StripeLink } from '@/components/disputes/DisputesTable';
 import { useIncidentCommissionRefunds } from '@/lib/hooks/useDisputes';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { formatInstant } from '@/lib/utils/restaurantAlerts';
-import { formatCents, INCIDENT_COMMISSION_STATE_LABELS } from '@/lib/utils/disputes';
+import { formatCents, INCIDENT_COMMISSION_LIMIT, INCIDENT_COMMISSION_STATE_LABELS } from '@/lib/utils/disputes';
 
 /** Essais de reprise de cron-capture-retry avant abandon (claim_incident_commission_retries). */
 const MAX_ATTEMPTS = 6;
@@ -86,6 +86,11 @@ export function IncidentCommissionRefundsSection() {
                 ))}
               </tbody>
             </table>
+            {data!.truncated && (
+              <p className="text-xs text-gray-400 mt-3" data-testid="incident-commission-truncated">
+                Liste limitée aux {INCIDENT_COMMISSION_LIMIT} incidents les plus récents dont la commission n’est pas rendue.
+              </p>
+            )}
           </div>
         )}
       </div>

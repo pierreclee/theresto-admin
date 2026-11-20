@@ -6,6 +6,7 @@ import { useRestaurantRecharges } from '@/lib/hooks/useDisputes';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { formatDay, formatInstant } from '@/lib/utils/restaurantAlerts';
 import {
+  countLabel,
   formatCents,
   formatMonth,
   INVOICE_STATUS_LABELS,
@@ -43,7 +44,7 @@ export function RechargesSection({ restaurantId }: { restaurantId: string }) {
       ) : (
         <div className="p-5 space-y-6">
           <div>
-            <Title>Refacturations ({data.recharges.length})</Title>
+            <Title>Refacturations {countLabel(data.recharges.length, data.truncated.recharges)}</Title>
             {data.recharges.length === 0 ? (
               <p className="text-sm text-gray-500">Aucune refacturation.</p>
             ) : (
@@ -82,7 +83,7 @@ export function RechargesSection({ restaurantId }: { restaurantId: string }) {
           </div>
 
           <div>
-            <Title>Reprises des refacturations impayées ({data.recoveries.length})</Title>
+            <Title>Reprises des refacturations impayées {countLabel(data.recoveries.length, data.truncated.recoveries)}</Title>
             <p className="text-xs text-gray-400 mb-2">
               Annulation de virements vers le compte Stripe du restaurant, 15 jours après l’échec de la facture ; 5 essais.
             </p>
@@ -130,7 +131,7 @@ export function RechargesSection({ restaurantId }: { restaurantId: string }) {
           </div>
 
           <div>
-            <Title>Litiges ({data.disputes.length})</Title>
+            <Title>Litiges {data.truncated.disputes ? `(${data.disputes.length}, les plus récents)` : `(${data.disputes.length})`}</Title>
             <DisputesTable disputes={data.disputes} showRestaurant={false} />
           </div>
         </div>

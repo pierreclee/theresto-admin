@@ -23,6 +23,12 @@ import type {
   RecoveryRow,
   RestaurantRechargesResult,
 } from '@/lib/types/disputes';
+import {
+  INCIDENT_COMMISSION_LIMIT,
+  RECHARGES_LIMIT,
+  RECOVERIES_LIMIT,
+  RESTAURANT_DISPUTES_LIMIT,
+} from '@/lib/utils/disputes';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Statuts non finaux d'un litige Stripe (dispute_status_final en SQL). */
@@ -151,16 +157,16 @@ export async function getRestaurantRechargesAction(restaurantId: string): Promis
       .select('id, kind, amount_ht, booking_date, period, occurred_at, invoice_id')
       .eq('restaurant_id', restaurantId)
       .order('occurred_at', { ascending: false })
-      .limit(200),
+      .limit(RECHARGES_LIMIT),
     db.from('commission_recharge_recoveries')
       .select('invoice_id, due_cents, recovered_cents, credited_cents, status, attempts, last_error, next_attempt_at, created_at')
       .eq('restaurant_id', restaurantId)
       .order('created_at', { ascending: false })
-      .limit(50),
+      .limit(RECOVERIES_LIMIT),
     db.from('booking_disputes').select(BOOKING_DISPUTE_COLUMNS).eq('restaurant_id', restaurantId)
-      .order('opened_at', { ascending: false }).limit(100),
+      .order('opened_at', { ascending: false }).limit(RESTAURANT_DISPUTES_LIMIT),
     db.from('platform_disputes').select(PLATFORM_DISPUTE_COLUMNS).eq('restaurant_id', restaurantId)
-      .order('opened_at', { ascending: false }).limit(100),
+      .order('opened_at', { ascending: false }).limit(RESTAURANT_DISPUTES_LIMIT),
     db.from('restaurants').select('id, name').eq('id', restaurantId).maybeSingle(),
   ]);
   for (const r of [recharges, recoveries, bookingDisputes, platformDisputes, restaurant]) {
@@ -215,6 +221,12 @@ export async function getRestaurantRechargesAction(restaurantId: string): Promis
       ...((bookingDisputes.data ?? []) as Row[]).map((r) => toBookingDispute(r, names)),
       ...((platformDisputes.data ?? []) as Row[]).map((r) => toPlatformDispute(r, names)),
     ].sort((a, b) => b.openedAt.localeCompare(a.openedAt)),
+    truncated: {
+      recharges: rechargeRows.length >= RECHARGES_LIMIT,
+      recoveries: recoveryRows.length >= RECOVERIES_LIMIT,
+      disputes: (bookingDisputes.data ?? []).length >= RESTAURANT_DISPUTES_LIMIT
+        || (platformDisputes.data ?? []).length >= RESTAURANT_DISPUTES_LIMIT,
+    },
     livemode: (await getServerEnvironment()) === 'production',
   };
 
@@ -230,8 +242,15 @@ export async function getRestaurantRechargesAction(restaurantId: string): Promis
 
 /**
  * Incidents CRM dont la commission à rendre au restaurant (paiement v2) n'est pas encore rendue :
- * reprise programmée par cron-capture-retry (6 essais à intervalle doublé), abandonnée
- * (refund_commission_next_at NULL après le dernier échec : à traiter à la main), ou jamais tentée.
+ * reprise programmée par cron-capture-retry (6 essais à intervalle doublé) ou abandonnée
+ * (refund_commission_next_at NULL après le dernier échec : à traiter à la main).
+ *
+ * Filtre dans la requête, avant la limite : refund_commission_failed_at est posé par
+ * complete_incident_refund dès que la commission due dépasse la commission rendue, gardé par
+ * note_incident_commission_failure, et remis à NULL seulement par
+ * record_incident_commission_refund quand la commission est rendue (migrations 20261130200100
+ * et 20261130200400 de theresto_app). Un filtre après coup laisserait un incident abandonné
+ * ancien hors des derniers incidents remboursés lus.
  */
 export async function listIncidentCommissionRefundsAction(): Promise<ActionResult<IncidentCommissionRefundsResult>> {
   const admin = await requireAdmin();
@@ -240,11 +259,14 @@ export async function listIncidentCommissionRefundsAction(): Promise<ActionResul
     .from('incidents')
     .select(INCIDENT_COLUMNS)
     .gt('refund_commission_due_cents', 0)
+    .not('refund_commission_failed_at', 'is', null)
     .order('created_at', { ascending: false })
-    .limit(LIST_LIMIT);
+    .limit(INCIDENT_COMMISSION_LIMIT);
   if (error) return dbFailure(error, 'Impossible de charger les incidents.');
-  // Commission rendue en entier : rien à faire (filtre fait ici, PostgREST ne compare pas deux colonnes).
-  const rows = ((data ?? []) as Row[]).filter((r) => int(r.refund_commission_due_cents) > int(r.refund_commission_cents));
+  const fetched = (data ?? []) as Row[];
+  // Défense en profondeur : une commission rendue en entier n'a rien à faire ici
+  // (PostgREST ne compare pas deux colonnes).
+  const rows = fetched.filter((r) => int(r.refund_commission_due_cents) > int(r.refund_commission_cents));
   const { names, error: namesError } = await restaurantNames(db, rows.map((r) => str(r.restaurant_id)));
   if (namesError) return dbFailure(namesError, 'Impossible de charger les incidents.');
 
@@ -279,5 +301,8 @@ export async function listIncidentCommissionRefundsAction(): Promise<ActionResul
     details: { count: incidents.length, abandoned: incidents.filter((i) => i.state === 'abandoned').length },
   });
   if (!logged) return adminLogRefusal();
-  return { ok: true, data: { incidents, livemode: (await getServerEnvironment()) === 'production' } };
+  return {
+    ok: true,
+    data: { incidents, truncated: fetched.length >= INCIDENT_COMMISSION_LIMIT, livemode: (await getServerEnvironment()) === 'production' },
+  };
 }

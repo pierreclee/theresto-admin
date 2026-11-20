@@ -1,5 +1,18 @@
 // Libellés et liens Stripe des litiges, refacturations, reprises et incidents (sans dépendance serveur).
 
+/** Limites de lecture de la fiche d'un restaurant (les plus récentes d'abord). */
+export const RECHARGES_LIMIT = 200;
+export const RECOVERIES_LIMIT = 50;
+/** Par table de litiges (réservation, hors réservation). */
+export const RESTAURANT_DISPUTES_LIMIT = 100;
+/** Liste des commissions d'incidents non rendues (incidents les plus récents). */
+export const INCIDENT_COMMISSION_LIMIT = 500;
+
+/** Titre d'une liste : « (12) », ou « (200 premières) » si la lecture a atteint sa limite. */
+export function countLabel(count: number, truncated: boolean): string {
+  return truncated ? `(${count} premières)` : `(${count})`;
+}
+
 const STRIPE_ID = /^[a-z]{2,4}_[A-Za-z0-9_]{1,200}$/;
 const STRIPE_PATHS: Record<string, string> = {
   du: 'disputes', dp: 'disputes', re: 'refunds', fee: 'connect/application_fees', in: 'invoices',
@@ -99,7 +112,7 @@ export const RECOVERY_STATUS_LABELS: Record<string, string> = {
 export const INCIDENT_COMMISSION_STATE_LABELS: Record<string, string> = {
   abandoned: 'Abandonné : à traiter à la main',
   retrying: 'Nouvel essai programmé',
-  pending: 'Pas encore tenté',
+  pending: 'En attente',
 };
 
 /** Montant en centimes → « 12,34 € » (devise du litige, euro par défaut). */

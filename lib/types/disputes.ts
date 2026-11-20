@@ -66,6 +66,8 @@ export interface RestaurantRechargesResult {
   recharges: RechargeRow[];
   recoveries: RecoveryRow[];
   disputes: DisputeRow[];
+  /** Listes tronquées à leur limite de lecture (les plus récentes seulement). */
+  truncated: { recharges: boolean; recoveries: boolean; disputes: boolean };
   livemode: boolean;
 }
 
@@ -84,11 +86,13 @@ export interface IncidentCommissionRefundRow {
   attempts: number;
   failedAt: string | null;
   nextAttemptAt: string | null;
-  /** abandoned : 6 essais en échec (plus repris) ; retrying : reprise programmée ; pending : jamais tenté. */
+  /** abandoned : 6 essais en échec (plus repris) ; retrying : reprise programmée ; pending : ni l'un ni l'autre (ne devrait pas arriver). */
   state: 'abandoned' | 'retrying' | 'pending';
 }
 
 export interface IncidentCommissionRefundsResult {
   incidents: IncidentCommissionRefundRow[];
+  /** Vrai si la liste a été tronquée à la limite de lecture (500 incidents les plus récents). */
+  truncated: boolean;
   livemode: boolean;
 }
