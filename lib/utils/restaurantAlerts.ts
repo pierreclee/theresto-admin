@@ -1,19 +1,40 @@
 // Libellés et règles d'affichage des alertes des restaurants (sans dépendance serveur).
 import type { AlertSeverity, PendingLapseWeek, RestaurantAlert } from '@/lib/types/restaurantAlerts';
 
+// Contrat : docs/features/admin-restaurant-alerts.md §3.3 et §6 (dépôt theresto_app).
 export const ALERT_KIND_LABELS: Record<string, string> = {
   restaurant_suspended: 'Restaurant suspendu',
-  commission_billing_suspended: 'Commissions impayées : réservations en ligne coupées',
+  commission_billing_suspended: 'Commissions impayées',
   privatization_incident_open: 'Incident de paiement de privatisation',
   commission_invoice_failed: 'Facture de commissions en échec',
+  subscription_past_due: 'Prélèvement de l’abonnement en échec',
+  subscription_unpaid: 'Abonnement impayé : repassé en Essentiel',
+  dispute_open: 'Litige ouvert sur un paiement',
+  dispute_lost: 'Litige perdu : refacturé',
+  dispute_reversed_after_billing: 'Litige renversé après facturation : avoir à faire',
+  dispute_other_open: 'Litige hors réservation',
+  recharge_recovery_failed: 'Reprise des refacturations en échec',
   pending_lapse: 'Demandes non confirmées à la fin du service',
   essentiel_without_payment_method: 'Essentiel sans moyen de paiement',
+  ontime_contest_pending: 'Contestation OnTime à trancher',
+  ontime_suspended: 'OnTime suspendue',
+  ontime_warning: 'Avertissement OnTime',
+  ontime_threshold_reached: 'Seuil de suspension OnTime atteint',
+  ontime_withdrawn: 'OnTime retirée',
   closure_pending: 'Clôture en cours',
 };
 
-/** Libellé d'un type ; un type inconnu (types futurs, chantier C) ne fait jamais planter l'écran. */
+/** Libellé d'un type ; un type inconnu (types futurs) ne fait jamais planter l'écran. */
 export function alertKindLabel(kind: string): string {
   return ALERT_KIND_LABELS[kind] ?? 'Autre alerte';
+}
+
+/** Libellé d'une alerte, précisé par ses chiffres quand le type en dépend. */
+export function alertLabel(alert: { kind: string; metrics?: Record<string, unknown> | null }): string {
+  if (alert.kind === 'commission_billing_suspended' && alert.metrics?.online_bookings_blocked === true) {
+    return 'Commissions impayées : réservations en ligne coupées';
+  }
+  return alertKindLabel(alert.kind);
 }
 
 const SEVERITY_RANK: Record<AlertSeverity, number> = { critical: 0, warning: 1, info: 2 };
@@ -140,23 +161,110 @@ export const ALERT_SETTINGS_CONFLICT_MESSAGE =
 /** Fermetures listées par page sur la fiche (la RPC accepte 1 à 200). */
 export const CLOSURES_PAGE_SIZE = 20;
 
+const PLAN_LABELS: Record<string, string> = {
+  essentiel: 'Essentiel', croissance: 'Croissance', liberte: 'Liberté', premium: 'Liberté', free: 'Essentiel',
+};
+
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  unpaid: 'Nouvelles tentatives épuisées',
+  paused: 'Abonnement en pause',
+  incomplete_expired: 'Premier paiement jamais abouti',
+};
+
+const DISPUTE_SOURCE_LABELS: Record<string, string> = {
+  invoice: 'facture', dine_in: 'sur place', booking_unmatched: 'réservation introuvable', other: 'autre',
+};
+
 /** Détail court d'une alerte, d'après ses chiffres connus ; null pour un type sans détail. */
-export function alertDetail(alert: { kind: string; metrics: Record<string, unknown> }): string | null {
+export function alertDetail(alert: { kind: string; severity?: string; metrics: Record<string, unknown> }): string | null {
   const m = alert.metrics ?? {};
   const n = (key: string) => (typeof m[key] === 'number' ? (m[key] as number) : Number.NaN);
+  const has = (key: string) => Number.isFinite(n(key));
   const euro = (v: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(v);
+  const cents = (key: string) => euro(n(key) / 100);
+  const text = (key: string) => (typeof m[key] === 'string' ? (m[key] as string) : null);
+  const plan = (key: string) => {
+    const v = text(key);
+    return v ? (PLAN_LABELS[v] ?? v) : null;
+  };
+  const list = (key: string) =>
+    (Array.isArray(m[key]) ? (m[key] as unknown[]).filter((v): v is string => typeof v === 'string') : []);
+  const join = (parts: (string | null)[]) => parts.filter(Boolean).join(' · ') || null;
+  const unpaid = () =>
+    `${n('unpaid_invoices')} facture(s) impayée(s)${has('unpaid_amount_ht') ? `, ${euro(n('unpaid_amount_ht'))} HT` : ''}`;
   switch (alert.kind) {
     case 'pending_lapse':
-      return Number.isFinite(n('lapsed_30d')) && Number.isFinite(n('total_30d'))
+      return has('lapsed_30d') && has('total_30d')
         ? `${n('lapsed_30d')} sur ${n('total_30d')} demandes en 30 jours (${formatRate(n('rate_30d'))})`
         : null;
     case 'commission_billing_suspended':
+      if (!has('unpaid_invoices')) return null;
+      return join([
+        unpaid(),
+        m.online_bookings_blocked === true
+          ? 'réservations en ligne coupées'
+          : plan('plan') ? `formule ${plan('plan')}, réservations en ligne ouvertes` : null,
+      ]);
     case 'commission_invoice_failed':
-      return Number.isFinite(n('unpaid_invoices'))
-        ? `${n('unpaid_invoices')} facture(s) impayée(s)${Number.isFinite(n('unpaid_amount_ht')) ? `, ${euro(n('unpaid_amount_ht'))} HT` : ''}`
-        : null;
+      if (!has('unpaid_invoices')) return null;
+      return join([unpaid(), text('suspension_from') ? `suspension possible le ${formatInstant(text('suspension_from'), false)}` : null]);
     case 'privatization_incident_open':
-      return Number.isFinite(n('open_incidents')) ? `${n('open_incidents')} incident(s) ouvert(s)` : null;
+      return has('open_incidents') ? `${n('open_incidents')} incident(s) ouvert(s)` : null;
+    case 'subscription_past_due':
+      return join([
+        plan('plan') ? `Formule ${plan('plan')}` : null,
+        text('suspension_from') ? `suspension possible le ${formatInstant(text('suspension_from'), false)} (CGV 6.5)` : null,
+      ]);
+    case 'subscription_unpaid':
+      return join([SUBSCRIPTION_STATUS_LABELS[text('status') ?? ''] ?? null, plan('plan') ? `formule actuelle ${plan('plan')}` : null]);
+    case 'dispute_open':
+      if (!has('open_disputes')) return null;
+      return join([
+        `${n('open_disputes')} litige(s) ouvert(s)${has('amount_cents') ? `, ${cents('amount_cents')}` : ''}`,
+        text('evidence_due_by') ? `réponse avant le ${formatInstant(text('evidence_due_by'))}` : null,
+      ]);
+    case 'dispute_lost':
+      if (!has('lost_disputes_30d')) return null;
+      return `${n('lost_disputes_30d')} litige(s) perdu(s) en 30 jours${has('amount_cents') ? `, ${cents('amount_cents')}` : ''}`
+        + (has('fee_cents') ? ` + ${cents('fee_cents')} de frais` : '');
+    case 'dispute_reversed_after_billing':
+      if (!has('disputes')) return null;
+      return `${n('disputes')} litige(s)${has('billed_amount_ht') ? `, ${euro(n('billed_amount_ht'))} HT déjà facturés` : ''} : avoir à faire à la main`;
+    case 'dispute_other_open': {
+      if (!has('open_disputes')) return null;
+      const sources = list('sources').map((s) => DISPUTE_SOURCE_LABELS[s] ?? s);
+      return `${n('open_disputes')} litige(s)${has('amount_cents') ? `, ${cents('amount_cents')}` : ''}`
+        + (sources.length ? ` (${sources.join(', ')})` : '');
+    }
+    case 'recharge_recovery_failed': {
+      if (!has('recoveries')) return null;
+      const errors = list('errors');
+      return join([
+        `${n('recoveries')} reprise(s)${has('missing_cents') ? `, ${cents('missing_cents')} non repris` : ''}`,
+        errors.length ? `erreurs Stripe : ${errors.join(', ')}` : null,
+        alert.severity === 'critical' ? 'abandonnée après 5 essais' : null,
+      ]);
+    }
+    case 'ontime_contest_pending':
+      if (!has('contested_reports')) return null;
+      return `${n('contested_reports')} contestation(s)${has('oldest_days') ? `, la plus ancienne depuis ${n('oldest_days')} jour(s)` : ''}`;
+    case 'ontime_suspended':
+      return join([
+        text('ends_at') ? `Jusqu'au ${formatInstant(text('ends_at'))}` : null,
+        has('failures') && has('served') ? `${n('failures')} manquement(s) sur ${n('served')} servie(s)` : null,
+        m.recidive === true ? 'récidive : retrait à envisager' : null,
+      ]);
+    case 'ontime_warning':
+      return join([
+        has('failures') && has('served') ? `${n('failures')} manquement(s) sur ${n('served')} servie(s) (${formatRate(n('rate'))})` : null,
+        m.acknowledged === true ? 'engagement confirmé' : m.acknowledged === false ? 'engagement non confirmé' : null,
+      ]);
+    case 'ontime_threshold_reached':
+      if (!has('failures_30d') || !has('served_30d')) return null;
+      return join([
+        `${n('failures_30d')} manquement(s) sur ${n('served_30d')} servie(s) en 30 jours (${formatRate(n('rate_30d'))})`,
+        m.sanctions_enabled === false ? 'sanctions éteintes : aucune suspension appliquée' : null,
+      ]);
     case 'closure_pending':
       return typeof m.anonymization_from === 'string'
         ? `Anonymisation à partir du ${formatInstant(m.anonymization_from as string, false)}`
