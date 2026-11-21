@@ -15,6 +15,7 @@ import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 import { AppVersionPoliciesCard } from '@/components/config/AppVersionPoliciesCard';
 import { RestaurantAlertSettingsCard } from '@/components/config/RestaurantAlertSettingsCard';
 import { OntimeSanctionsCard } from '@/components/config/OntimeSanctionsCard';
+import { MaintenanceCard } from '@/components/config/MaintenanceCard';
 
 // ─── Read-only row ────────────────────────────────────────────────────────────
 
@@ -121,6 +122,9 @@ export default function ConfigPage() {
           </div>
         )}
       </div>
+
+      {/* Mode maintenance de la plateforme (Edge Function platform-status-settings) */}
+      <MaintenanceCard />
 
       {/* Subscription prices (Stripe) */}
       <SubscriptionPricesCard />
