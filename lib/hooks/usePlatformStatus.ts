@@ -9,7 +9,11 @@ import {
 import { verifyTotpCode } from '@/lib/auth/verifyTotp';
 import { useToast } from '@/components/shared/Toaster';
 import { ActionError } from '@/lib/api/actionResult';
-import { platformStatusErrorMessage } from '@/lib/utils/platformStatus';
+import {
+  isNetworkFailure,
+  PLATFORM_STATUS_NETWORK_MESSAGE,
+  platformStatusErrorMessage,
+} from '@/lib/utils/platformStatus';
 import type { PlatformStatusInput } from '@/lib/types/platformStatus';
 
 const STATUS_KEY = ['platformStatus'];
@@ -55,18 +59,28 @@ export function useMaintenancePeriods() {
 /**
  * Modification : code TOTP vérifié d'abord (l'Edge Function exige un second facteur de moins
  * de 5 min), puis l'action serveur. Lève une ActionError (message en français, code de l'Edge
- * Function) ; l'état et l'historique sont relus même en cas d'erreur.
+ * Function, ou « network » pour une coupure) ; l'état et l'historique sont relus même en cas
+ * d'erreur.
  */
 export function useUpdatePlatformStatus() {
   const toast = useToast();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ totpCode, input }: { totpCode: string; input: () => PlatformStatusInput }) => {
-      await verifyTotpCode(totpCode);
-      // Saisie construite après la vérification du code : « Maintenant » = heure de l'envoi.
-      const result = await updatePlatformStatusAction(input());
-      if (!result.ok) throw new ActionError(platformStatusErrorMessage(result.code, result.error), result.code);
-      return result.data;
+      try {
+        await verifyTotpCode(totpCode);
+        // Saisie construite après la vérification du code : « Maintenant » = heure de l'envoi.
+        const result = await updatePlatformStatusAction(input());
+        if (!result.ok) throw new ActionError(platformStatusErrorMessage(result.code, result.error), result.code);
+        return result.data;
+      } catch (e) {
+        // Coupure réseau : message en français plutôt que « Failed to fetch ». Un nouvel essai
+        // après un enregistrement passé malgré tout donne un conflit, jamais un écrasement.
+        if (!(e instanceof ActionError) && isNetworkFailure(e)) {
+          throw new ActionError(PLATFORM_STATUS_NETWORK_MESSAGE, 'network');
+        }
+        throw e;
+      }
     },
     onSuccess: (data) => {
       queryClient.setQueryData(STATUS_KEY, data.status);

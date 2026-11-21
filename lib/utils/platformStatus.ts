@@ -275,3 +275,17 @@ export function platformStatusErrorMessage(code: string | undefined, serverMessa
 
 /** Code d'erreur qui impose de repartir des valeurs du serveur. */
 export const isConflict = (code: string | undefined) => code === 'conflict' || code === 'failed-precondition';
+
+export const PLATFORM_STATUS_NETWORK_MESSAGE =
+  'Connexion au serveur impossible : vérifiez votre connexion internet, puis réessayez.';
+
+/**
+ * Échec du réseau (navigateur hors ligne, serveur injoignable) : messages bruts du navigateur,
+ * de fetch ou du client Supabase (« Failed to fetch », « fetch failed », « Load failed »…).
+ */
+export function isNetworkFailure(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === 'AuthRetryableFetchError') return true;
+  return /failed to fetch|fetch failed|networkerror|network request failed|load failed|connection closed/i
+    .test(error.message);
+}
