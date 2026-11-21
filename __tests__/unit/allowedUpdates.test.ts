@@ -55,13 +55,13 @@ describe('pickAllowedRestaurantUpdates', () => {
 });
 
 describe('pickAllowedConfigUpdates', () => {
-  it('garde currency et maintenanceMode, retire le reste', () => {
+  it('garde currency seulement : maintenanceMode (ancien interrupteur) est retiré', () => {
     const { allowed, ignored } = pickAllowedConfigUpdates({
       currency: 'EUR', maintenanceMode: true, id: 'other', commission_rate: 1, updated_by: 'x',
     });
-    expect(allowed).toEqual({ currency: 'EUR', maintenanceMode: true });
-    expect(ignored.sort()).toEqual(['commission_rate', 'id', 'updated_by']);
-    expect([...ALLOWED_CONFIG_UPDATE_FIELDS].sort()).toEqual(['currency', 'maintenanceMode']);
+    expect(allowed).toEqual({ currency: 'EUR' });
+    expect(ignored.sort()).toEqual(['commission_rate', 'id', 'maintenanceMode', 'updated_by']);
+    expect([...ALLOWED_CONFIG_UPDATE_FIELDS]).toEqual(['currency']);
   });
 
   it('objet vide après filtre', () => {
@@ -70,12 +70,9 @@ describe('pickAllowedConfigUpdates', () => {
 });
 
 describe('toConfigColumns', () => {
-  it('mappe maintenanceMode vers la colonne maintenance_mode', () => {
-    expect(toConfigColumns({ maintenanceMode: true })).toEqual({ maintenance_mode: true });
-    expect(toConfigColumns({ maintenanceMode: false, currency: 'USD' })).toEqual({
-      maintenance_mode: false,
-      currency: 'USD',
-    });
+  it('n écrit jamais maintenance_mode', () => {
+    expect(toConfigColumns({ maintenanceMode: true })).toEqual({});
+    expect(toConfigColumns({ maintenanceMode: false, currency: 'USD' })).toEqual({ currency: 'USD' });
   });
 
   it('ne produit que les colonnes fournies', () => {

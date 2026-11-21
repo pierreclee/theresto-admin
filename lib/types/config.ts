@@ -1,13 +1,10 @@
 export interface PlatformConfig {
   currency: string;
-  maintenanceMode: boolean;
   updatedAt?: Date;
-  updatedBy?: string;
 }
 
 export interface UpdatePlatformConfigInput {
   currency?: string;
-  maintenanceMode?: boolean;
 }
 
 export type PaidPlan = 'croissance' | 'liberte';

@@ -276,15 +276,13 @@ export async function getAuditLogsAction(
 export async function getConfigAction(): Promise<PlatformConfig> {
   await requireAdmin();
   const adminDb = await getAdminClient();
-  const { data, error } = await adminDb.from('app_config').select('*').eq('id', 'global').single();
+  const { data, error } = await adminDb.from('app_config').select('currency, updated_at').eq('id', 'global').single();
   
   if (error && error.code !== 'PGRST116') throw new Error(error.message); // Ignore missing row (we'll return defaults)
   
   return {
     currency: data?.currency ?? 'EUR',
-    maintenanceMode: data?.maintenance_mode ?? false,
     updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
-    updatedBy: data?.updated_by,
   };
 }
 
@@ -304,13 +302,14 @@ export async function updateConfigAction(
   
   const payload = {
     ...toConfigColumns(allowed),
-    updated_by: user.email || user.id,
+    // Id de l'admin, jamais son e-mail : l'auteur est dans platform_logs (performed_by_email).
+    updated_by: user.id,
     updated_at: new Date().toISOString(),
   };
   
   const { data, error } = await adminDb.from('app_config').upsert({ id: 'global', ...payload }).select().single();
   if (error) throw new Error(error.message);
-  // Liste blanche pickAllowedConfigUpdates (devise, mode maintenance) : valeurs non personnelles.
+  // Liste blanche pickAllowedConfigUpdates (devise) : valeurs non personnelles.
   const auditLogged = await logAdminAction(user, {
     action: 'update_platform_config', targetType: 'config', targetId: 'global',
     details: { ...allowed },
@@ -319,9 +318,7 @@ export async function updateConfigAction(
   return {
     config: {
       currency: data?.currency ?? 'EUR',
-      maintenanceMode: data?.maintenance_mode ?? false,
       updatedAt: data?.updated_at ? new Date(data.updated_at) : undefined,
-      updatedBy: data?.updated_by,
     },
     auditLogged,
   };
