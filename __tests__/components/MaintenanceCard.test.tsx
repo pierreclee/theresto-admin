@@ -136,6 +136,52 @@ describe('MaintenanceCard', () => {
     expect(screen.getByText('Continuer')).toBeInTheDocument();
   });
 
+  it('état relu pendant la saisie : la version lue à l ouverture part (409 côté serveur, pas d écrasement)', async () => {
+    const { rerender } = render(<MaintenanceCard />);
+    fireEvent.click(screen.getByText('Programmer une maintenance'));
+    // Relecture (chaque minute, ou après un échec) : un autre admin a modifié la maintenance.
+    status = { ...off, updatedAt: '2026-12-01T10:01:30.000000+00:00' };
+    rerender(<MaintenanceCard />);
+    fireEvent.click(screen.getByText('Continuer'));
+    typeCode();
+    fireEvent.click(screen.getByText('Enregistrer'));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(sentInput().expectedUpdatedAt).toBe(T0);
+  });
+
+  it('désactivation : version lue à l ouverture, même après une relecture', async () => {
+    status = { ...off, enabled: true, startsAt: at(-1), endsAt: at(2), active: true };
+    const { rerender } = render(<MaintenanceCard />);
+    fireEvent.click(screen.getByText('Terminer maintenant'));
+    status = { ...status, endsAt: at(5), updatedAt: '2026-12-01T10:01:30.000000+00:00' };
+    rerender(<MaintenanceCard />);
+    typeCode();
+    fireEvent.click(screen.getAllByText('Terminer maintenant').at(-1) as HTMLElement);
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalled());
+    expect(sentInput()).toMatchObject({ enabled: false, endsAt: at(2), expectedUpdatedAt: T0 });
+  });
+
+  it('conflit : la saisie repart de l état relu, avec sa version', async () => {
+    const T1 = '2026-12-01T10:01:30.000000+00:00';
+    mutateAsync.mockRejectedValueOnce(new ActionError(PLATFORM_STATUS_CONFLICT_MESSAGE, 'conflict'));
+    const { rerender } = render(<MaintenanceCard />);
+    fireEvent.click(screen.getByText('Programmer une maintenance'));
+    fireEvent.click(screen.getByText('Continuer'));
+    typeCode();
+    fireEvent.click(screen.getByText('Enregistrer'));
+    expect(await screen.findByRole('alert')).toHaveTextContent('a changé entre-temps');
+    expect(sentInput().expectedUpdatedAt).toBe(T0);
+    status = { ...off, enabled: true, startsAt: at(30), endsAt: at(32), updatedAt: T1 };
+    rerender(<MaintenanceCard />);
+    // Saisie reprise de l'état relu (maintenance programmée par l'autre admin).
+    expect(screen.getByLabelText('Date et heure de début')).toHaveValue('2026-12-02T17:00');
+    fireEvent.click(screen.getByText('Continuer'));
+    typeCode();
+    fireEvent.click(screen.getByText('Enregistrer'));
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+    expect(sentInput()).toMatchObject({ startsAt: at(30), expectedUpdatedAt: T1 });
+  });
+
   it('journal en échec (503) : reste sur le code, message affiché', async () => {
     mutateAsync.mockRejectedValue(new ActionError(platformStatusErrorMessage('audit-log-failed'), 'audit-log-failed'));
     render(<MaintenanceCard />);

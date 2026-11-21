@@ -52,6 +52,10 @@ type ModalMode = 'edit' | 'disable';
  */
 function MaintenanceModal({ status, mode, onClose }: { status: PlatformStatus; mode: ModalMode; onClose: () => void }) {
   const { mutateAsync } = useUpdatePlatformStatus();
+  // État lu à l'ouverture de la boîte : sa version part en expectedUpdatedAt, même si l'état
+  // est relu entre-temps (relecture chaque minute, ou après un échec). Une modification faite
+  // ailleurs pendant la saisie donne donc un conflit (409), jamais un écrasement.
+  const [base, setBase] = useState<PlatformStatus>(status);
   const [step, setStep] = useState<'form' | 'confirm'>(mode === 'edit' ? 'form' : 'confirm');
   const [draft, setDraft] = useState<MaintenanceDraft>(() => draftFromStatus(status, new Date()));
   const [preview, setPreview] = useState<PlatformStatusInput | null>(null);
@@ -59,19 +63,20 @@ function MaintenanceModal({ status, mode, onClose }: { status: PlatformStatus; m
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [pending, setPending] = useState(false);
-  // Après un conflit : la saisie repart des valeurs relues dès qu'elles arrivent.
+  // Après un conflit seulement : la boîte repart des valeurs relues dès qu'elles arrivent.
   const [staleUpdatedAt, setStaleUpdatedAt] = useState<string | null>(null);
   if (staleUpdatedAt !== null && staleUpdatedAt !== status.updatedAt) {
     setStaleUpdatedAt(null);
+    setBase(status);
     setDraft(draftFromStatus(status, new Date()));
   }
 
-  const phase = maintenancePhase(status, new Date());
+  const phase = maintenancePhase(base, new Date());
   const set = <K extends keyof MaintenanceDraft>(key: K, value: MaintenanceDraft[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
 
   const goToConfirm = () => {
-    const parsed = parseMaintenanceDraft(draft, status, new Date());
+    const parsed = parseMaintenanceDraft(draft, base, new Date());
     if (!parsed.ok) {
       setError(parsed.error);
       return;
@@ -83,9 +88,9 @@ function MaintenanceModal({ status, mode, onClose }: { status: PlatformStatus; m
   };
 
   const buildInput = (): PlatformStatusInput => {
-    if (mode === 'disable') return disableInput(status);
+    if (mode === 'disable') return disableInput(base);
     // Revalidé à l'envoi : « Maintenant » prend l'heure de l'envoi, une fin a pu passer.
-    const parsed = parseMaintenanceDraft(draft, status, new Date());
+    const parsed = parseMaintenanceDraft(draft, base, new Date());
     if (!parsed.ok) throw new ActionError(parsed.error, 'invalid-argument');
     return parsed.value;
   };
@@ -108,10 +113,10 @@ function MaintenanceModal({ status, mode, onClose }: { status: PlatformStatus; m
       // Saisie refusée : retour à la saisie. Code TOTP refusé, journal en échec : on reste
       // sur l'étape du code.
       if (isConflict(errorCode)) {
-        if (mode === 'disable') {
-          setStep('confirm');
-        } else {
-          setStaleUpdatedAt(status.updatedAt);
+        // Valeurs relues adoptées dès qu'elles diffèrent de la version envoyée (tout de
+        // suite si l'état a déjà été relu pendant la saisie).
+        setStaleUpdatedAt(base.updatedAt);
+        if (mode === 'edit') {
           setPreview(null);
           setStep('form');
         }
