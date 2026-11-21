@@ -34,14 +34,38 @@ const PHASE_STYLES: Record<MaintenancePhase, string> = {
   ended: 'bg-gray-50 text-gray-600 border-gray-200',
 };
 
-/** Heure courante, rafraîchie toutes les 30 s (début et fin automatiques). */
-function useNow(): Date {
+/**
+ * Heure courante : rafraîchie toutes les 30 s, à chaque nouvel état (un enregistrement
+ * « Maintenant » s'affiche « En cours » tout de suite) et juste après le prochain début ou la
+ * prochaine fin programmés.
+ */
+function useNow(status: PlatformStatus | undefined): Date {
   const [now, setNow] = useState(() => new Date());
+  const [seen, setSeen] = useState(status);
+  if (seen !== status) {
+    setSeen(status);
+    setNow(new Date());
+  }
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30 * 1000);
     return () => clearInterval(timer);
   }, []);
+  const next = nextBoundary(status, now);
+  useEffect(() => {
+    if (next === null) return;
+    const timer = setTimeout(() => setNow(new Date()), Math.max(0, next - Date.now()) + 50);
+    return () => clearTimeout(timer);
+  }, [next]);
   return now;
+}
+
+/** Prochain début ou fin programmé après [now] (dans les 30 s : sinon la minuterie suffit). */
+function nextBoundary(status: PlatformStatus | undefined, now: Date): number | null {
+  if (!status?.enabled) return null;
+  const times = [status.startsAt, status.endsAt]
+    .map((iso) => (iso ? Date.parse(iso) : NaN))
+    .filter((t) => !Number.isNaN(t) && t > now.getTime() && t - now.getTime() <= 30 * 1000);
+  return times.length ? Math.min(...times) : null;
 }
 
 type ModalMode = 'edit' | 'disable';
@@ -331,7 +355,7 @@ function MaintenanceHistory() {
 /** Réglage « Mode maintenance » : état, programmation, désactivation, historique. */
 export function MaintenanceCard() {
   const { data: status, isPending, error } = usePlatformStatus();
-  const now = useNow();
+  const now = useNow(status);
   const [modal, setModal] = useState<ModalMode | null>(null);
   const phase = status ? maintenancePhase(status, now) : null;
   const current = phase === 'scheduled' || phase === 'announced' || phase === 'active';

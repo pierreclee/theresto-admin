@@ -118,6 +118,23 @@ describe('MaintenanceCard', () => {
     expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('En cours');
   });
 
+  it('nouvel état (enregistrement « Maintenant ») : « En cours » tout de suite, sans attendre 30 s', () => {
+    const { rerender } = render(<MaintenanceCard />);
+    act(() => { jest.advanceTimersByTime(20 * 1000); });
+    // Enregistrée 20 s après le dernier tic : début = heure de l'envoi.
+    status = { ...off, enabled: true, level: 'all', startsAt: new Date().toISOString(), active: true, updatedAt: '2026-12-01T10:00:20.000000+00:00' };
+    rerender(<MaintenanceCard />);
+    expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('En cours');
+  });
+
+  it('début programmé dans quelques secondes : « En cours » à l heure dite', () => {
+    status = { ...off, enabled: true, startsAt: new Date(NOW.getTime() + 5000).toISOString(), announced: true };
+    render(<MaintenanceCard />);
+    expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('Annoncée');
+    act(() => { jest.advanceTimersByTime(5100); });
+    expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('En cours');
+  });
+
   it('fin automatique atteinte : « Terminée »', () => {
     status = { ...off, enabled: true, startsAt: at(-3), endsAt: at(-1) };
     render(<MaintenanceCard />);
