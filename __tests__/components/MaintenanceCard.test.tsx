@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MaintenanceCard } from '@/components/config/MaintenanceCard';
 import { ActionError } from '@/lib/api/actionResult';
 import { platformStatusErrorMessage, PLATFORM_STATUS_CONFLICT_MESSAGE } from '@/lib/utils/platformStatus';
-import type { PlatformStatus, PlatformStatusInput } from '@/lib/types/platformStatus';
+import type { PendingMaintenanceSegment, PlatformStatus, PlatformStatusInput } from '@/lib/types/platformStatus';
 
 const mutateAsync = jest.fn();
 const T0 = '2026-12-01T10:00:00.123456+00:00';
@@ -21,11 +21,15 @@ jest.mock('@/lib/hooks/usePlatformStatus', () => ({
   usePlatformStatus: () => ({ data: status, isPending: false, error: null }),
   useUpdatePlatformStatus: () => ({ mutateAsync }),
   useMaintenancePeriods: () => ({
-    data: [{ id: 1, level: 'all', startedAt: '2026-11-20T01:00:00Z', endedAt: '2026-11-20T03:30:00Z' }],
+    data: {
+      periods: [{ id: 1, level: 'all', startedAt: '2026-11-20T01:00:00Z', endedAt: '2026-11-20T03:30:00Z' }],
+      pending,
+    },
     isPending: false,
     error: null,
   }),
 }));
+let pending: PendingMaintenanceSegment | null = null;
 
 /** Saisie envoyée : la mutation reçoit une fonction (appelée après la vérification du code). */
 const sentInput = (): PlatformStatusInput => mutateAsync.mock.calls.at(-1)?.[0].input();
@@ -39,6 +43,7 @@ describe('MaintenanceCard', () => {
     jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'] });
     mutateAsync.mockReset().mockResolvedValue({});
     status = off;
+    pending = null;
   });
   afterEach(() => jest.useRealTimers());
 
@@ -133,6 +138,27 @@ describe('MaintenanceCard', () => {
     expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('Annoncée');
     act(() => { jest.advanceTimersByTime(5100); });
     expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('En cours');
+  });
+
+  it('historique : période en cours puis terminée par sa fin programmée, avant d être inscrite', () => {
+    status = { ...off, enabled: true, startsAt: at(-1), endsAt: at(0.25), active: true };
+    pending = { level: 'clients', startedAt: at(-1), plannedEndAt: at(0.25) };
+    render(<MaintenanceCard />);
+    const line = screen.getByTestId('maintenance-pending-period');
+    expect(line).toHaveTextContent('→ en cours');
+    expect(line).toHaveTextContent('Période en cours, déduite de l’état actuel.');
+    expect(line).toHaveTextContent('1 h');
+    act(() => { jest.advanceTimersByTime(0.5 * HOUR); });
+    expect(screen.getByTestId('maintenance-phase')).toHaveTextContent('Terminée');
+    expect(screen.getByTestId('maintenance-pending-period')).toHaveTextContent('inscrite à la prochaine modification');
+    expect(screen.getByTestId('maintenance-pending-period')).toHaveTextContent('1 h 15');
+  });
+
+  it('historique : période à venir absente', () => {
+    status = { ...off, enabled: true, startsAt: at(2), announced: true };
+    pending = { level: 'clients', startedAt: at(2), plannedEndAt: null };
+    render(<MaintenanceCard />);
+    expect(screen.queryByTestId('maintenance-pending-period')).not.toBeInTheDocument();
   });
 
   it('fin automatique atteinte : « Terminée »', () => {

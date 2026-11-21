@@ -27,6 +27,18 @@ export interface PlatformStatusInput {
   expectedUpdatedAt: string;
 }
 
+/**
+ * Période de la ligne platform_status, pas encore inscrite dans platform_maintenance_periods
+ * (elle ne l'est qu'à la modification suivante) : début réel (jamais avant la dernière
+ * modification, period_floor) et fin programmée (null : jusqu'à la désactivation). Elle peut
+ * être à venir, en cours ou terminée par sa fin programmée : à situer à l'écran avec l'heure.
+ */
+export interface PendingMaintenanceSegment {
+  level: MaintenanceLevel;
+  startedAt: string;
+  plannedEndAt: string | null;
+}
+
 /** Période de maintenance réellement passée (platform_maintenance_periods). */
 export interface MaintenancePeriod {
   id: number;

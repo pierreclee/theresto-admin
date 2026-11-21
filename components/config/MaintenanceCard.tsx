@@ -17,6 +17,7 @@ import {
   MAX_MAINTENANCE_MESSAGE_LENGTH,
   maintenancePhase,
   parseMaintenanceDraft,
+  pendingSegmentEntry,
   PHASE_LABELS,
   type MaintenanceDraft,
   type MaintenancePhase,
@@ -324,20 +325,39 @@ function MaintenanceSummary({ input, startsNow }: { input: PlatformStatusInput; 
   );
 }
 
-function MaintenanceHistory() {
-  const { data: periods, isPending, error } = useMaintenancePeriods();
+function MaintenanceHistory({ now }: { now: Date }) {
+  const { data, isPending, error } = useMaintenancePeriods();
+  // Période de la ligne (en cours, ou terminée par sa fin programmée) : pas encore inscrite,
+  // elle l'est à la modification suivante. Déduite de l'état et marquée comme telle.
+  const pending = pendingSegmentEntry(data?.pending, now);
   return (
     <div className="px-5 py-4 border-t border-gray-50">
       <h4 className="text-xs font-semibold text-gray-700 mb-2">Historique des maintenances</h4>
       {error ? (
         <p className="text-xs text-gray-400">{error.message}</p>
-      ) : isPending || !periods ? (
+      ) : isPending || !data ? (
         <div className="h-8 bg-gray-50 rounded-lg animate-pulse" />
-      ) : periods.length === 0 ? (
+      ) : data.periods.length === 0 && !pending ? (
         <p className="text-xs text-gray-400">Aucune maintenance passée.</p>
       ) : (
         <ul className="divide-y divide-gray-50 text-xs">
-          {periods.map((p) => (
+          {pending && (
+            <li data-testid="maintenance-pending-period" className="flex items-center justify-between gap-3 py-1.5">
+              <span className="text-gray-700">
+                {formatParis(pending.startedAt)} → {pending.endedAt ? formatParis(pending.endedAt) : 'en cours'}
+                <span className="block text-gray-400">
+                  {pending.endedAt
+                    ? 'Terminée par sa fin programmée : inscrite à la prochaine modification.'
+                    : 'Période en cours, déduite de l’état actuel.'}
+                </span>
+              </span>
+              <span className="flex items-center gap-2 text-gray-500 flex-shrink-0">
+                <span>{formatDuration(Date.parse(pending.endedAt ?? now.toISOString()) - Date.parse(pending.startedAt))}</span>
+                <span className="px-1.5 py-0.5 rounded border border-gray-200">{LEVEL_INFO[pending.level]?.label ?? pending.level}</span>
+              </span>
+            </li>
+          )}
+          {data.periods.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-1.5">
               <span className="text-gray-700">{formatParis(p.startedAt)} → {formatParis(p.endedAt)}</span>
               <span className="flex items-center gap-2 text-gray-500 flex-shrink-0">
@@ -428,7 +448,7 @@ export function MaintenanceCard() {
         </div>
       )}
 
-      <MaintenanceHistory />
+      <MaintenanceHistory now={now} />
 
       {status && modal && <MaintenanceModal key={modal} status={status} mode={modal} onClose={() => setModal(null)} />}
     </div>

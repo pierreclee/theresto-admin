@@ -7,6 +7,7 @@
  */
 const invokeEdgeFunction = jest.fn();
 const periodsQuery = { select: jest.fn(), order: jest.fn(), limit: jest.fn() };
+const statusQuery = { select: jest.fn(), eq: jest.fn(), maybeSingle: jest.fn() };
 const from = jest.fn();
 jest.mock('@supabase/ssr', () => ({ createServerClient: jest.fn() }));
 jest.mock('next/headers', () => ({ cookies: jest.fn() }));
@@ -31,6 +32,8 @@ import {
   isConflict,
   maintenancePhase,
   parisInputToIso,
+  pendingMaintenanceSegment,
+  pendingSegmentEntry,
   parseMaintenanceDraft,
   platformStatusErrorMessage,
   PLATFORM_STATUS_CONFLICT_MESSAGE,
@@ -180,9 +183,12 @@ describe('erreurs de l Edge Function', () => {
 describe('actions serveur', () => {
   beforeEach(() => {
     invokeEdgeFunction.mockReset().mockResolvedValue({ ok: true, data: {} });
-    from.mockReset().mockReturnValue(periodsQuery);
+    from.mockReset().mockImplementation((table: string) => (table === 'platform_status' ? statusQuery : periodsQuery));
     periodsQuery.select.mockReturnValue(periodsQuery);
     periodsQuery.order.mockReturnValue(periodsQuery);
+    statusQuery.select.mockReturnValue(statusQuery);
+    statusQuery.eq.mockReturnValue(statusQuery);
+    statusQuery.maybeSingle.mockResolvedValue({ data: null, error: null });
   });
 
   it('lecture : action getPlatformStatus', async () => {
@@ -205,11 +211,31 @@ describe('actions serveur', () => {
       data: [{ id: 2, level: 'all', started_at: at(-5), ended_at: at(-4) }], error: null,
     });
     await expect(getMaintenancePeriodsAction()).resolves.toEqual({
-      ok: true, data: { periods: [{ id: 2, level: 'all', startedAt: at(-5), endedAt: at(-4) }] },
+      ok: true, data: { periods: [{ id: 2, level: 'all', startedAt: at(-5), endedAt: at(-4) }], pending: null },
     });
     expect(from).toHaveBeenCalledWith('platform_maintenance_periods');
     expect(periodsQuery.select).toHaveBeenCalledWith('id, level, started_at, ended_at');
     expect(periodsQuery.order).toHaveBeenCalledWith('started_at', { ascending: false });
+  });
+
+  it('historique : période de la ligne pas encore inscrite, début jamais avant la dernière modification', async () => {
+    periodsQuery.limit.mockResolvedValue({ data: [], error: null });
+    statusQuery.maybeSingle.mockResolvedValue({
+      data: { maintenance_enabled: true, maintenance_level: 'clients', starts_at: at(-3), ends_at: at(-1), period_floor: at(-2) },
+      error: null,
+    });
+    await expect(getMaintenancePeriodsAction()).resolves.toEqual({
+      ok: true, data: { periods: [], pending: { level: 'clients', startedAt: at(-2), plannedEndAt: at(-1) } },
+    });
+    expect(statusQuery.select).toHaveBeenCalledWith('maintenance_enabled, maintenance_level, starts_at, ends_at, period_floor');
+    expect(statusQuery.eq).toHaveBeenCalledWith('id', true);
+  });
+
+  it('historique : état illisible, périodes inscrites gardées', async () => {
+    jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    periodsQuery.limit.mockResolvedValue({ data: [{ id: 2, level: 'all', started_at: at(-5), ended_at: at(-4) }], error: null });
+    statusQuery.maybeSingle.mockResolvedValue({ data: null, error: { code: '42501' } });
+    await expect(getMaintenancePeriodsAction()).resolves.toMatchObject({ ok: true, data: { pending: null } });
   });
 
   it('historique illisible (table absente) : refus lisible, pas d exception', async () => {
@@ -227,5 +253,30 @@ describe('actions serveur', () => {
     await expect(getMaintenancePeriodsAction()).rejects.toThrow();
     expect(invokeEdgeFunction).not.toHaveBeenCalled();
     expect(from).not.toHaveBeenCalled();
+  });
+});
+
+describe('période de la ligne (historique)', () => {
+  const row = { maintenance_enabled: true, maintenance_level: 'all' as const, starts_at: at(-1), ends_at: at(1), period_floor: null };
+
+  it('désactivée, sans début, ou déjà inscrite (fin avant la dernière modification) : rien', () => {
+    expect(pendingMaintenanceSegment(null)).toBeNull();
+    expect(pendingMaintenanceSegment({ ...row, maintenance_enabled: false })).toBeNull();
+    expect(pendingMaintenanceSegment({ ...row, starts_at: null })).toBeNull();
+    expect(pendingMaintenanceSegment({ ...row, period_floor: at(2) })).toBeNull();
+  });
+
+  it('début = max(starts_at, period_floor), fin programmée gardée', () => {
+    expect(pendingMaintenanceSegment(row)).toEqual({ level: 'all', startedAt: at(-1), plannedEndAt: at(1) });
+    expect(pendingMaintenanceSegment({ ...row, period_floor: at(-0.5), ends_at: null }))
+      .toEqual({ level: 'all', startedAt: at(-0.5), plannedEndAt: null });
+  });
+
+  it('à venir : absente ; en cours : sans fin ; fin programmée passée : terminée', () => {
+    expect(pendingSegmentEntry({ level: 'all', startedAt: at(1), plannedEndAt: null }, NOW)).toBeNull();
+    expect(pendingSegmentEntry({ level: 'all', startedAt: at(-1), plannedEndAt: at(1) }, NOW))
+      .toEqual({ level: 'all', startedAt: at(-1), endedAt: null });
+    expect(pendingSegmentEntry({ level: 'all', startedAt: at(-2), plannedEndAt: at(-1) }, NOW))
+      .toEqual({ level: 'all', startedAt: at(-2), endedAt: at(-1) });
   });
 });

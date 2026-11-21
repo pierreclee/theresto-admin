@@ -2,9 +2,11 @@
 
 import { getAdminClient, requireAdmin } from '@/lib/supabase/server';
 import { invokeEdgeFunction, type ActionResult } from '@/lib/supabase/invokeFunction';
+import { pendingMaintenanceSegment, type PlatformStatusPeriodRow } from '@/lib/utils/platformStatus';
 import type {
   MaintenanceLevel,
   MaintenancePeriod,
+  PendingMaintenanceSegment,
   PlatformStatus,
   PlatformStatusInput,
 } from '@/lib/types/platformStatus';
@@ -48,9 +50,13 @@ interface PeriodRow {
 
 /**
  * Périodes de maintenance passées (platform_maintenance_periods, lecture par la clé service) :
- * niveau, début et fin réelle, aucune donnée personnelle.
+ * niveau, début et fin réelle, aucune donnée personnelle. Plus la période de la ligne
+ * platform_status (`pending`), inscrite seulement à la modification suivante : sans elle, une
+ * maintenance en cours ou terminée par sa fin programmée manquerait à l'historique.
  */
-export async function getMaintenancePeriodsAction(): Promise<ActionResult<{ periods: MaintenancePeriod[] }>> {
+export async function getMaintenancePeriodsAction(): Promise<
+  ActionResult<{ periods: MaintenancePeriod[]; pending: PendingMaintenanceSegment | null }>
+> {
   await requireAdmin();
   const db = await getAdminClient();
   const { data, error } = await db
@@ -65,5 +71,13 @@ export async function getMaintenancePeriodsAction(): Promise<ActionResult<{ peri
   const periods = ((data ?? []) as PeriodRow[]).map((r) => ({
     id: r.id, level: r.level, startedAt: r.started_at, endedAt: r.ended_at,
   }));
-  return { ok: true, data: { periods } };
+  // Ligne illisible : l'historique inscrit reste affiché, sans la période en cours.
+  const { data: row, error: rowError } = await db
+    .from('platform_status')
+    .select('maintenance_enabled, maintenance_level, starts_at, ends_at, period_floor')
+    .eq('id', true)
+    .maybeSingle();
+  if (rowError) console.error('[maintenance] état illisible pour l historique', rowError.code);
+  const pending = rowError ? null : pendingMaintenanceSegment((row ?? null) as PlatformStatusPeriodRow | null);
+  return { ok: true, data: { periods, pending } };
 }

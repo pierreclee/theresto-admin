@@ -50,7 +50,7 @@ export function useMaintenancePeriods() {
     queryFn: async () => {
       const result = await getMaintenancePeriodsAction().catch(() => null);
       if (!result?.ok) throw new ActionError('Historique des maintenances indisponible.', result?.code);
-      return result.data.periods;
+      return result.data;
     },
     staleTime: 60 * 1000,
   });

@@ -4,6 +4,7 @@
 
 import type {
   MaintenanceLevel,
+  PendingMaintenanceSegment,
   PlatformStatus,
   PlatformStatusInput,
 } from '@/lib/types/platformStatus';
@@ -139,6 +140,42 @@ export function announcementText(startsAtIso: string, now: Date): string {
   }
   return `Bandeau « Maintenance prévue le … » affiché à partir du ${formatParis(new Date(starts - ANNOUNCE_HOURS * HOUR_MS).toISOString())}`
     + ' (48 h avant le début), jusqu’au début.';
+}
+
+// ─── Historique ──────────────────────────────────────────────────────────────
+
+/** Colonnes de platform_status lues pour l'historique (aucune donnée personnelle). */
+export interface PlatformStatusPeriodRow {
+  maintenance_enabled: boolean;
+  maintenance_level: MaintenanceLevel;
+  starts_at: string | null;
+  ends_at: string | null;
+  period_floor: string | null;
+}
+
+/**
+ * Période de la ligne, même calcul que platform_maintenance_segments() : début =
+ * max(starts_at, period_floor), fin = ends_at ; rien si désactivée ou vide.
+ */
+export function pendingMaintenanceSegment(row: PlatformStatusPeriodRow | null): PendingMaintenanceSegment | null {
+  if (!row?.maintenance_enabled || !row.starts_at) return null;
+  const starts = Date.parse(row.starts_at);
+  const floor = row.period_floor ? Date.parse(row.period_floor) : NaN;
+  if (Number.isNaN(starts)) return null;
+  const startedAt = !Number.isNaN(floor) && floor > starts ? (row.period_floor as string) : row.starts_at;
+  const ends = row.ends_at ? Date.parse(row.ends_at) : NaN;
+  if (!Number.isNaN(ends) && ends <= Date.parse(startedAt)) return null;
+  return { level: row.maintenance_level, startedAt, plannedEndAt: row.ends_at };
+}
+
+/** Ligne de l'historique pour la période de la ligne : null si elle n'a pas commencé à [now]. */
+export function pendingSegmentEntry(
+  segment: PendingMaintenanceSegment | null | undefined,
+  now: Date,
+): { level: MaintenanceLevel; startedAt: string; endedAt: string | null } | null {
+  if (!segment || Date.parse(segment.startedAt) > now.getTime()) return null;
+  const ended = segment.plannedEndAt !== null && Date.parse(segment.plannedEndAt) <= now.getTime();
+  return { level: segment.level, startedAt: segment.startedAt, endedAt: ended ? segment.plannedEndAt : null };
 }
 
 // ─── Saisie ──────────────────────────────────────────────────────────────────
