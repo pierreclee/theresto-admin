@@ -1,14 +1,12 @@
 'use client';
 
-import { useState } from 'react';
 import {
   ShieldCheck,
   Clock,
   Globe,
   AlertTriangle,
-  Power,
 } from 'lucide-react';
-import { usePlatformConfig, useUpdatePlatformConfig } from '@/lib/hooks/usePlatformConfig';
+import { usePlatformConfig } from '@/lib/hooks/usePlatformConfig';
 import { SubscriptionPricesCard } from '@/components/config/SubscriptionPricesCard';
 import { OnlineCommissionRatesCard } from '@/components/config/OnlineCommissionRatesCard';
 import { PrivatizationCommissionRatesCard } from '@/components/config/PrivatizationCommissionRatesCard';
@@ -17,63 +15,7 @@ import { RevenueBackfillCard } from '@/components/config/RevenueBackfillCard';
 import { AppVersionPoliciesCard } from '@/components/config/AppVersionPoliciesCard';
 import { RestaurantAlertSettingsCard } from '@/components/config/RestaurantAlertSettingsCard';
 import { OntimeSanctionsCard } from '@/components/config/OntimeSanctionsCard';
-
-// ─── Toggle row ───────────────────────────────────────────────────────────────
-
-function ToggleRow({
-  icon: Icon,
-  label,
-  description,
-  value,
-  onSave,
-  dangerous,
-}: {
-  icon: React.ElementType;
-  label: string;
-  description: string;
-  value: boolean;
-  onSave: (v: boolean) => Promise<void>;
-  dangerous?: boolean;
-}) {
-  const [saving, setSaving] = useState(false);
-
-  const handleToggle = async () => {
-    setSaving(true);
-    try {
-      await onSave(!value);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="flex items-center justify-between py-4 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className={`w-8 h-8 rounded-lg border flex items-center justify-center flex-shrink-0 ${
-          dangerous && value ? 'bg-red-50 border-red-100' : 'bg-gray-50 border-gray-100'
-        }`}>
-          <Icon size={15} className={dangerous && value ? 'text-red-500' : 'text-gray-500'} />
-        </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-gray-800">{label}</p>
-          <p className="text-xs text-gray-400">{description}</p>
-        </div>
-      </div>
-
-      <button
-        onClick={handleToggle}
-        disabled={saving}
-        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0 disabled:opacity-60 ${
-          value ? (dangerous ? 'bg-red-500' : 'bg-[#FF6B35]') : 'bg-gray-200'
-        }`}
-      >
-        <span className={`inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          value ? 'translate-x-4' : 'translate-x-0.5'
-        }`} />
-      </button>
-    </div>
-  );
-}
+import { MaintenanceCard } from '@/components/config/MaintenanceCard';
 
 // ─── Read-only row ────────────────────────────────────────────────────────────
 
@@ -131,7 +73,6 @@ function ConfigSkeleton() {
 
 export default function ConfigPage() {
   const { data: config, isPending, error } = usePlatformConfig();
-  const { mutateAsync } = useUpdatePlatformConfig();
 
   const updatedLabel = config?.updatedAt
     ? `Modifié le ${config.updatedAt.toLocaleDateString('fr-FR', {
@@ -140,7 +81,7 @@ export default function ConfigPage() {
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
-      })} par ${config.updatedBy ?? 'inconnu'}`
+      })}`
     : null;
 
   return (
@@ -182,6 +123,9 @@ export default function ConfigPage() {
         )}
       </div>
 
+      {/* Mode maintenance de la plateforme (Edge Function platform-status-settings) */}
+      <MaintenanceCard />
+
       {/* Subscription prices (Stripe) */}
       <SubscriptionPricesCard />
 
@@ -205,28 +149,6 @@ export default function ConfigPage() {
 
       {/* Registre des revenus (reprise depuis Stripe) */}
       <RevenueBackfillCard />
-
-      {/* Operations */}
-      <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-50">
-          <h3 className="text-sm font-semibold text-gray-900">Opérations</h3>
-        </div>
-
-        {isPending ? (
-          <ConfigSkeleton />
-        ) : (
-          <div className="px-5">
-            <ToggleRow
-              icon={Power}
-              label="Mode maintenance"
-              description="Désactive l'accès public à l'application client"
-              value={config?.maintenanceMode ?? false}
-              dangerous
-              onSave={(v) => mutateAsync({ maintenanceMode: v }).then(() => undefined)}
-            />
-          </div>
-        )}
-      </div>
 
       {/* Security — read-only */}
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">

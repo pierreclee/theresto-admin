@@ -16,7 +16,9 @@ export const ALLOWED_RESTAURANT_UPDATE_FIELDS = [
   'facebook_url',
 ] as const;
 
-export const ALLOWED_CONFIG_UPDATE_FIELDS = ['currency', 'maintenanceMode'] as const;
+// maintenanceMode retiré : l'ancien interrupteur app_config.maintenance_mode n'est lu par
+// aucune app ; le mode maintenance passe par l'Edge Function platform-status-settings.
+export const ALLOWED_CONFIG_UPDATE_FIELDS = ['currency'] as const;
 
 function pickAllowed(
   input: unknown,
@@ -47,6 +49,5 @@ export function pickAllowedConfigUpdates(input: unknown) {
 export function toConfigColumns(allowed: Record<string, unknown>): Record<string, unknown> {
   const columns: Record<string, unknown> = {};
   if ('currency' in allowed) columns.currency = allowed.currency;
-  if ('maintenanceMode' in allowed) columns.maintenance_mode = allowed.maintenanceMode;
   return columns;
 }

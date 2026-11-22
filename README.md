@@ -135,6 +135,20 @@ Section « Versions de l'app mobile » de `/config` : version et build minimaux 
 (409) et journalise elle-même (`update_app_version_policy`, refus 503 si le journal échoue). Contrat :
 `docs/features/app-version-policy.md` du dépôt theresto_app.
 
+## Mode maintenance
+
+Section « Mode maintenance » de `/config` : niveau (« Clients » : App et widget fermés ; « Tout » : Hub et
+espace employé aussi, case de confirmation), début immédiat ou programmé, fin automatique facultative,
+message (300 caractères), heures saisies à l'heure de Paris ; « Terminer maintenant » désactive en gardant
+le réglage. Les apps l'annoncent 48 h avant (CGV 9.2). Edge Function `platform-status-settings`
+(`lib/actions/platformStatusSettings.ts`) : code TOTP de moins de 5 minutes, conflit 409 (version lue à
+l'ouverture de la boîte de saisie), journal écrit par la fonction (`update_platform_status`, refus 503 s'il
+échoue). Historique lu dans `platform_maintenance_periods` (clé service, sans donnée personnelle), plus la
+période de la ligne `platform_status` pas encore inscrite (en cours, ou terminée par sa fin programmée),
+marquée comme telle. L'ancien interrupteur
+`app_config.maintenance_mode` n'est plus réglable ni lu ; `app_config.updated_by` reçoit l'id de l'admin.
+Contrat : `docs/features/maintenance-mode.md` du dépôt theresto_app.
+
 ## Alertes des restaurants (chantier B, lot B6)
 
 Contrat : `docs/features/admin-restaurant-alerts.md` du dépôt theresto_app. Server Actions

@@ -94,17 +94,26 @@ describe('écritures journalisées', () => {
 
   it('configuration : journal en échec, auditLogged=false', async () => {
     insert.mockResolvedValue({ error: { code: '42501' } });
-    await expect(updateConfigAction({ maintenanceMode: true } as never))
+    await expect(updateConfigAction({ currency: 'EUR' }))
       .resolves.toMatchObject({ auditLogged: false });
   });
 
   it('configuration : valeurs non personnelles', async () => {
-    await expect(updateConfigAction({ maintenanceMode: true } as never))
+    await expect(updateConfigAction({ currency: 'EUR' }))
       .resolves.toMatchObject({ config: { currency: 'EUR' }, auditLogged: true });
     expect(upsert).toHaveBeenCalled();
     expect(logged()).toEqual([expect.objectContaining({
-      action: 'update_platform_config', target_type: 'config', target_id: 'global', details: { maintenanceMode: true },
+      action: 'update_platform_config', target_type: 'config', target_id: 'global', details: { currency: 'EUR' },
     })]);
+  });
+
+  it('configuration : id de l admin dans updated_by, jamais son e-mail ; maintenanceMode refusé', async () => {
+    await expect(updateConfigAction({ maintenanceMode: true } as never)).rejects.toThrow('Aucun champ modifiable');
+    await updateConfigAction({ currency: 'EUR' });
+    const row = upsert.mock.calls.at(-1)?.[1];
+    expect(row).toMatchObject({ id: 'global', currency: 'EUR', updated_by: 'admin-1' });
+    expect(row).not.toHaveProperty('maintenance_mode');
+    expect(JSON.stringify(row)).not.toContain('@');
   });
 });
 

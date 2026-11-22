@@ -93,9 +93,9 @@ describe('écritures : auditLogged=false signalé', () => {
   });
 
   it('configuration', async () => {
-    (updateConfigAction as jest.Mock).mockResolvedValue({ config: { currency: 'EUR', maintenanceMode: true }, auditLogged: false });
+    (updateConfigAction as jest.Mock).mockResolvedValue({ config: { currency: 'EUR' }, auditLogged: false });
     const { result } = renderHook(() => useUpdatePlatformConfig(), { wrapper });
-    await act(() => result.current.mutateAsync({ maintenanceMode: true }));
+    await act(() => result.current.mutateAsync({ currency: 'EUR' }));
     expect(toast).toHaveBeenCalledWith(NOT_LOGGED, 'error');
   });
 });

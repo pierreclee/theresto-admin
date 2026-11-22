@@ -53,6 +53,12 @@ const EXEMPT: Record<string, string> = {
   withdrawOntimeAction: 'journalisée par la RPC admin_withdraw_ontime (ontime_withdrawn), même transaction',
   liftOntimeSanctionAction: 'journalisée par la RPC admin_lift_ontime_sanction (ontime_sanction_lifted), même transaction',
   setOntimeSanctionsAction: 'journalisée par la RPC admin_set_ontime_sanctions (ontime_sanctions_switch), même transaction',
+  // platformStatusSettings.ts
+  getPlatformStatusAction: 'état du mode maintenance de la plateforme, non personnel',
+  updatePlatformStatusAction:
+    'journalisée par l Edge Function platform-status-settings (update_platform_status), '
+    + 'modification annulée et refusée (503) si le journal échoue',
+  getMaintenancePeriodsAction: 'périodes de maintenance (niveau, début, fin), aucune donnée personnelle',
   // privatizationIncidents.ts
   listPrivatizationIncidentsAction:
     'journalisée par l Edge Function admin-privatization-incidents (list_privatization_incidents), '
