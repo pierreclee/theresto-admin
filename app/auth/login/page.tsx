@@ -3,13 +3,11 @@
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { createClient, getClientEnvironment } from '@/lib/supabase/client';
 import type { AppEnvironment } from '@/lib/supabase/config';
 import { LoginFormSchema } from '@/lib/utils/validators';
 
 export default function LoginPage() {
-  const router = useRouter();
   const [env, setEnv] = useState<AppEnvironment>('staging');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -53,12 +51,14 @@ export default function LoginPage() {
 
       // Check MFA requirement
       const { data: mfaData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-      
-      if (mfaData && mfaData.nextLevel === 'aal2' && mfaData.currentLevel === 'aal1') {
-        router.push('/auth/mfa-challenge');
-      } else {
-        router.push('/');
-      }
+      const target =
+        mfaData && mfaData.nextLevel === 'aal2' && mfaData.currentLevel === 'aal1'
+          ? '/auth/mfa-challenge'
+          : '/';
+
+      // Chargement complet : AuthProvider lit la session avec le client de
+      // l'environnement ouvert au chargement de la page, qui peut être l'autre.
+      window.location.assign(target);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
