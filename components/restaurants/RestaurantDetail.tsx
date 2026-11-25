@@ -219,16 +219,46 @@ function OwnerRow({ ownerId }: { ownerId: string }) {
   );
 }
 
-function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boolean }) {
+/**
+ * État du Kbis d'après la fiche (contrat : docs/features/onboarding-accompagne.md de l'app).
+ * Jamais d'après `kbis_path` seul : la conservation le vide 30 jours après la validation
+ * (6 mois après un refus), ou 30 jours après un dépôt plus tardif.
+ */
+export type KbisState = 'available' | 'expected' | 'removed' | 'missing';
+
+export function kbisState(
+  r: Pick<
+    Restaurant,
+    'kbis_path' | 'kbis_required_later' | 'kbis_submitted_at' | 'approval_approved_at' | 'approval_rejected_at' | 'rejected_at'
+  >,
+): KbisState {
+  if (r.kbis_path) return 'available';
+  if (r.kbis_required_later) return 'expected';
+  // Un Kbis a été déposé, ou une décision de l'admin a fait courir la conservation.
+  if (r.kbis_submitted_at || r.approval_approved_at || r.approval_rejected_at || r.rejected_at) return 'removed';
+  return 'missing';
+}
+
+export const KBIS_STATE_LABELS: Record<Exclude<KbisState, 'available'>, string> = {
+  expected: 'Non fourni (à déposer par le restaurateur depuis le Hub)',
+  removed: 'Retiré (durée de conservation écoulée)',
+  missing: 'Non fourni',
+};
+
+export function KbisRow({ restaurant }: { restaurant: Restaurant }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const state = kbisState(restaurant);
+  const submittedAt = restaurant.kbis_submitted_at
+    ? new Date(restaurant.kbis_submitted_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    : null;
 
   const open = async () => {
     setLoading(true);
     setError('');
     // Opened before the await: browsers block popups opened after it
     const tab = window.open('', '_blank');
-    const result = await adminApi.getKbisUrl(restaurantId);
+    const result = await adminApi.getKbisUrl(restaurant.id);
     setLoading(false);
     if (result.ok) {
       if (tab) tab.location.href = result.url;
@@ -246,16 +276,21 @@ function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boo
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs text-gray-400 mb-0.5">Extrait Kbis</p>
-        {hasKbis ? (
-          <button
-            onClick={open}
-            disabled={loading}
-            className="text-sm font-medium text-[#FF6B35] hover:underline disabled:opacity-50"
-          >
-            {loading ? 'Ouverture…' : 'Voir le Kbis'}
-          </button>
+        {state === 'available' ? (
+          <>
+            <button
+              onClick={open}
+              disabled={loading}
+              className="text-sm font-medium text-[#FF6B35] hover:underline disabled:opacity-50"
+            >
+              {loading ? 'Ouverture…' : 'Voir le Kbis'}
+            </button>
+            {submittedAt && <p className="text-xs text-gray-400 mt-0.5">Déposé le {submittedAt}</p>}
+          </>
         ) : (
-          <p className="text-sm text-gray-400">Non fourni (à déposer par le restaurateur depuis le Hub)</p>
+          <p className={`text-sm ${state === 'expected' ? 'text-amber-700' : 'text-gray-400'}`}>
+            {KBIS_STATE_LABELS[state]}
+          </p>
         )}
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
       </div>
@@ -408,7 +443,7 @@ export function RestaurantDetail({ restaurant }: Props) {
             {restaurant.company_name_from_inpi && (
               <InfoRow icon={Landmark} label="Raison sociale (Sirene)" value={restaurant.company_name_from_inpi} />
             )}
-            <KbisRow restaurantId={restaurant.id} hasKbis={!!restaurant.kbis_path} />
+            <KbisRow restaurant={restaurant} />
           </div>
         </div>
 
