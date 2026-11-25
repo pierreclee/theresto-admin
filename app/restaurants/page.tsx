@@ -8,7 +8,8 @@ import type { RestaurantAlert } from '@/lib/types/restaurantAlerts';
 import { actionErrorMessage } from '@/lib/api/actionResult';
 import { RestaurantTable } from '@/components/restaurants/RestaurantTable';
 import { InviteRestaurantModal } from '@/components/restaurants/InviteRestaurantModal';
-import { Search, SlidersHorizontal, UserPlus } from 'lucide-react';
+import { AccompaniedOnboardingModal } from '@/components/restaurants/AccompaniedOnboardingModal';
+import { Handshake, Search, SlidersHorizontal, UserPlus } from 'lucide-react';
 import { LISTED_STATUSES } from '@/lib/constants/approval';
 
 function RestaurantsContent() {
@@ -17,6 +18,7 @@ function RestaurantsContent() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(searchParams.get('status') ?? '');
   const [showInvite, setShowInvite] = useState(false);
+  const [showAccompanied, setShowAccompanied] = useState(false);
 
   const { data, isPending, error } = useRestaurants({
     search: search || undefined,
@@ -41,16 +43,26 @@ function RestaurantsContent() {
             {data ? `${data.total} restaurant${data.total !== 1 ? 's' : ''}` : 'Chargement…'}
           </p>
         </div>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#FF6B35] hover:bg-[#e85f2d] rounded-xl transition-colors"
-        >
-          <UserPlus size={15} />
-          Inviter un restaurant
-        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            onClick={() => setShowAccompanied(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-[#FF6B35] bg-white hover:bg-orange-50 border border-[#FF6B35]/40 rounded-xl transition-colors"
+          >
+            <Handshake size={15} />
+            Parcours accompagné
+          </button>
+          <button
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-[#FF6B35] hover:bg-[#e85f2d] rounded-xl transition-colors"
+          >
+            <UserPlus size={15} />
+            Inviter un restaurant
+          </button>
+        </div>
       </div>
 
       {showInvite && <InviteRestaurantModal onClose={() => setShowInvite(false)} />}
+      {showAccompanied && <AccompaniedOnboardingModal onClose={() => setShowAccompanied(false)} />}
 
       <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
         <div className="flex gap-3 px-5 py-4 border-b border-gray-50">

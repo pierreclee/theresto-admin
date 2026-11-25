@@ -255,7 +255,7 @@ function KbisRow({ restaurantId, hasKbis }: { restaurantId: string; hasKbis: boo
             {loading ? 'Ouverture…' : 'Voir le Kbis'}
           </button>
         ) : (
-          <p className="text-sm text-gray-400">Non fourni</p>
+          <p className="text-sm text-gray-400">Non fourni (à déposer par le restaurateur depuis le Hub)</p>
         )}
         {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
       </div>
