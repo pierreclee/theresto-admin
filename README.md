@@ -45,6 +45,7 @@ npm run lint          # ESLint
 app/                  # Next.js App Router pages
 ├── auth/             # Login, MFA enrollment, MFA challenge
 ├── restaurants/      # List + detail pages
+├── access-requests/  # Demandes d'ouverture d'un espace restaurant
 ├── monitoring/       # Audit logs
 ├── users/            # Admin users (MVP)
 ├── links/            # Liens & QR (go.theresto.fr) : liste, fiche, QR, statistiques
@@ -217,6 +218,32 @@ Server Actions `lib/actions/disputes.ts`, lecture seule, clé service après `re
 - **Alertes :** libellés et détails des types `subscription_*`, `dispute_*`, `recharge_recovery_failed`,
   `ontime_*` ; « réservations en ligne coupées » seulement si `online_bookings_blocked`, « Litige perdu :
   refacturé » seulement si `has_recharge`.
+
+## Onboarding accompagné et demandes d'espace restaurant
+
+Contrat : `docs/features/onboarding-accompagne.md` du dépôt theresto_app (migrations
+`20261206100000_onboarding_accompanied.sql` et `20261206110000_restaurant_access_requests.sql`).
+
+- **Parcours accompagné** (`/restaurants`, bouton « Parcours accompagné ») : `admin-onboarding`
+  `createRestaurantInvitation` avec `mode: 'accompanied'` (2 heures, aucun e-mail). Le lien et le QR code
+  (dessiné dans le navigateur) ne s'affichent que si la réponse porte `mode === 'accompanied'` ; sinon la
+  fonction du serveur n'est pas à jour : message d'erreur (une invitation classique, e-mail de 7 jours, a
+  pu partir) et pas de nouvel essai depuis la fenêtre.
+- **Kbis (fiche d'un restaurant)** : `kbis_path` rempli → « Voir le Kbis » (+ date `kbis_submitted_at`) ;
+  vide et `kbis_required_later` → « Non fourni (à déposer par le restaurateur depuis le Hub) » ; vide sinon
+  → « Retiré (durée de conservation écoulée) » après un dépôt, une validation ou un refus, « Non fourni »
+  avant (`kbisState`, `RestaurantDetail.tsx`).
+- **Page `/access-requests`** (« Demandes d'espace » dans la barre latérale) : Server Actions
+  `lib/actions/accessRequests.ts`, RPC `admin_restaurant_access_requests` (filtre en attente par défaut,
+  invitées, refusées, toutes ; 500 au plus) et `admin_set_restaurant_access_request_status(p_id, 'declined')`
+  (confirmation ; P0A06 déjà traitée, P0A07 introuvable, P0A08 statut invalide). « Inviter » ouvre
+  l'invitation classique ou le parcours accompagné, adresse du compte préremplie et verrouillée :
+  `admin-onboarding` passe alors la demande à `invited` (aucune écriture ici).
+- **Journal** (`target_type = 'access_request'`) : `list_restaurant_access_requests` (filtre et nombre ;
+  consultation refusée si le journal échoue) et `decline_restaurant_access_request` (identifiant, statut
+  avant et après ; la base ne permet pas de remettre une demande en attente : journal en échec →
+  `auditLogged: false` et toast d'erreur). Jamais le nom du restaurant, la ville, le téléphone, le message
+  ni l'adresse.
 
 ## Key Documentation
 
