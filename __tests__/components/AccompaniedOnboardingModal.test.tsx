@@ -64,3 +64,48 @@ it('QR code : image SVG du lien exact, sans logo, dessinée dans le navigateur',
   expect(buildQrMatrix).toHaveBeenCalledWith(url, { withLogo: false });
   expect(decodeURIComponent(dataUrl!.split(',')[1])).toContain('<svg');
 });
+
+describe('fonction du serveur pas à jour (mode absent ou « email »)', () => {
+  async function launchOutdated(response: Record<string, unknown>) {
+    (inviteRestaurantOwnerAction as jest.Mock).mockResolvedValue(response);
+    const onInvited = jest.fn();
+    render(<AccompaniedOnboardingModal onClose={jest.fn()} onInvited={onInvited} />);
+    fireEvent.change(screen.getByLabelText('Adresse e-mail du restaurateur'), { target: { value: 'a@test.com' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Créer le lien' }));
+    await waitFor(() => expect(screen.getByRole('alert')).toBeTruthy());
+    return onInvited;
+  }
+
+  it('mode absent : ni lien ni QR, message honnête sur l e-mail classique, pas de nouvel essai', async () => {
+    const { mode: _mode, ...withoutMode } = invitation;
+    void _mode;
+    const onInvited = await launchOutdated({ ...withoutMode, emailSent: false });
+    const alert = screen.getByRole('alert').textContent ?? '';
+    expect(alert).toMatch(/n’est pas accompagnée : la fonction du serveur \(admin-onboarding\) n’est pas à jour/);
+    expect(alert).toMatch(/Une invitation classique \(e-mail, 7 jours\) a peut-être été envoyée à a@test\.com/);
+    expect(screen.queryByLabelText('Lien d’inscription')).toBeNull();
+    expect(screen.queryByAltText('QR code du lien d’inscription')).toBeNull();
+    expect(buildQrMatrix).not.toHaveBeenCalled();
+    expect((screen.getByRole('button', { name: 'Créer le lien' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(onInvited).toHaveBeenCalledTimes(1);
+  });
+
+  it('mode « email » et e-mail envoyé : le message le dit', async () => {
+    await launchOutdated({ ...invitation, mode: 'email', emailSent: true });
+    expect(screen.getByRole('alert').textContent).toMatch(/a été envoyée à a@test\.com/);
+    expect(screen.queryByLabelText('Lien d’inscription')).toBeNull();
+  });
+});
+
+it('adresse préremplie : verrouillée, envoyée telle quelle, onInvited appelé', async () => {
+  (inviteRestaurantOwnerAction as jest.Mock).mockResolvedValue(invitation);
+  const onInvited = jest.fn();
+  render(<AccompaniedOnboardingModal onClose={jest.fn()} initialEmail="a@test.com" onInvited={onInvited} />);
+  const input = screen.getByLabelText('Adresse e-mail du restaurateur') as HTMLInputElement;
+  expect(input.readOnly).toBe(true);
+  expect(input.value).toBe('a@test.com');
+  fireEvent.click(screen.getByRole('button', { name: 'Créer le lien' }));
+  await waitFor(() => expect(screen.getByLabelText('Lien d’inscription')).toBeTruthy());
+  expect(inviteRestaurantOwnerAction).toHaveBeenCalledWith('a@test.com', 'accompanied');
+  expect(onInvited).toHaveBeenCalledTimes(1);
+});

@@ -20,6 +20,25 @@ type Invitation = Extract<InviteRestaurantOwnerResult, { ok: true }>;
 
 interface Props {
   onClose: () => void;
+  /** Adresse préremplie et verrouillée (ex. depuis une demande d'espace restaurant). */
+  initialEmail?: string;
+  /** Appelé dès qu'une invitation a été créée (quel que soit son parcours). */
+  onInvited?: () => void;
+}
+
+/**
+ * Réponse d'une Edge Function admin-onboarding pas encore à jour : elle ignore `mode` et crée
+ * une invitation classique (e-mail, 7 jours). Le lien n'est alors jamais affiché comme un
+ * parcours accompagné.
+ */
+export function notAccompaniedMessage(invitation: Invitation): string {
+  const sent = invitation.emailSent
+    ? `Une invitation classique (e-mail, 7 jours) a été envoyée à ${invitation.email}.`
+    : `Une invitation classique (e-mail, 7 jours) a peut-être été envoyée à ${invitation.email}.`;
+  return (
+    'L’invitation créée n’est pas accompagnée : la fonction du serveur (admin-onboarding) n’est pas à jour. '
+    + `${sent} Aucun lien n’est affiché ici. Vérifiez le déploiement de la fonction avant de recommencer.`
+  );
 }
 
 /** Image (data: SVG) du QR code du lien, ou null si le rendu échoue. */
@@ -36,12 +55,15 @@ export function invitationQrDataUrl(url: string): string | null {
   }
 }
 
-export function AccompaniedOnboardingModal({ onClose }: Props) {
-  const [email, setEmail] = useState('');
+export function AccompaniedOnboardingModal({ onClose, initialEmail, onInvited }: Props) {
+  const [email, setEmail] = useState(initialEmail ?? '');
   const [error, setError] = useState('');
   const [isPending, setIsPending] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [copied, setCopied] = useState(false);
+  // Fonction du serveur pas à jour : pas de nouvel essai depuis cette fenêtre (chaque essai
+  // créerait une nouvelle invitation classique).
+  const [outdated, setOutdated] = useState(false);
   const toast = useToast();
 
   const qr = useMemo(() => (invitation ? invitationQrDataUrl(invitation.onboardingUrl) : null), [invitation]);
@@ -53,9 +75,15 @@ export function AccompaniedOnboardingModal({ onClose }: Props) {
     try {
       const result = await inviteRestaurantOwnerAction(email.trim(), 'accompanied');
       if (result.ok) {
-        setInvitation(result);
+        onInvited?.();
         if (result.auditLogged === false) {
-          toast("Parcours lancé, mais il n'a pas pu être journalisé. Prévenez l'équipe technique.", 'error');
+          toast("Invitation créée, mais elle n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
+        }
+        // Lien et QR seulement pour une invitation réellement accompagnée (2 heures, sans e-mail).
+        if (result.mode === 'accompanied') setInvitation(result);
+        else {
+          setOutdated(true);
+          setError(notAccompaniedMessage(result));
         }
       } else {
         setError(result.error);
@@ -169,16 +197,17 @@ export function AccompaniedOnboardingModal({ onClose }: Props) {
             <input
               type="email"
               required
-              autoFocus
+              autoFocus={!initialEmail}
+              readOnly={!!initialEmail}
               aria-label="Adresse e-mail du restaurateur"
               placeholder="email@restaurant.fr"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35]"
+              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] read-only:bg-gray-50 read-only:text-gray-600"
             />
 
             {error && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
+              <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{error}</p>
             )}
 
             <div className="flex gap-2">
@@ -192,7 +221,7 @@ export function AccompaniedOnboardingModal({ onClose }: Props) {
               </button>
               <button
                 type="submit"
-                disabled={!email.trim() || isPending}
+                disabled={!email.trim() || isPending || outdated}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors disabled:opacity-40"
               >
                 {isPending ? 'Création…' : 'Créer le lien'}
