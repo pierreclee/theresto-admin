@@ -22,12 +22,14 @@ import {
   QrCode,
   Timer,
   Scale,
+  Inbox,
 } from 'lucide-react';
 
 const routes: { href: string; label: string; icon: React.ElementType; exact?: boolean; badge?: boolean }[] = [
   { href: '/', label: 'Tableau de bord', icon: LayoutDashboard, exact: true },
   { href: '/approvals', label: 'Approbations', icon: Clock, badge: true },
   { href: '/restaurants', label: 'Restaurants', icon: Store },
+  { href: '/access-requests', label: 'Demandes d’espace', icon: Inbox },
   { href: '/users', label: 'Utilisateurs', icon: Users },
   { href: '/ontime', label: 'OnTime', icon: Timer },
   { href: '/incidents', label: 'Incidents de paiement', icon: AlertTriangle },
