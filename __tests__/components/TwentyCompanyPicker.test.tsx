@@ -143,6 +143,27 @@ it('« Retirer » : fiche et accord effacés, retour à la recherche', async () 
   expect((input() as HTMLInputElement).value).toBe('');
 });
 
+it('fiche choisie puis retirée pendant une recherche : indicateur arrêté, réponse ignorée', async () => {
+  let resolveLate: (v: unknown) => void = () => {};
+  search
+    .mockResolvedValueOnce({ ok: true, companies: [hygge, bistro] })
+    .mockImplementationOnce(() => new Promise((r) => { resolveLate = r; }));
+  render(<Harness />);
+  await typeAndWait('Hyg');
+  await screen.findAllByRole('option');
+  // Deuxième recherche en cours ; la fiche est choisie dans la liste précédente.
+  await typeAndWait('Hygg');
+  expect(screen.getByLabelText('Recherche en cours')).toBeTruthy();
+  fireEvent.click(screen.getAllByRole('option')[0]);
+  fireEvent.click(screen.getByRole('button', { name: /Retirer/ }));
+  expect(screen.queryByLabelText('Recherche en cours')).toBeNull();
+
+  await act(async () => { resolveLate({ ok: true, companies: [bistro] }); });
+  expect(screen.queryByLabelText('Recherche en cours')).toBeNull();
+  expect(screen.queryAllByRole('option')).toHaveLength(0);
+  expect(latest.company).toBeNull();
+});
+
 it('changer de fiche remet l accord à non', async () => {
   search.mockResolvedValue({ ok: true, companies: [hygge] });
   render(<Harness />);

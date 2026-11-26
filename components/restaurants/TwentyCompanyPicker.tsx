@@ -90,7 +90,14 @@ export function TwentyCompanyPicker({ value, onChange, photoConsent, onPhotoCons
     return () => clearTimeout(timer);
   }, [query, value]);
 
+  // Abandonne la recherche en cours : sa réponse sera ignorée et l'indicateur s'arrête.
+  const cancelSearch = () => {
+    lastRequest.current += 1;
+    setLoading(false);
+  };
+
   const select = (company: TwentyCompany) => {
+    cancelSearch();
     onChange(company);
     onPhotoConsentChange(false);
     setOpen(false);
@@ -98,6 +105,7 @@ export function TwentyCompanyPicker({ value, onChange, photoConsent, onPhotoCons
   };
 
   const clear = () => {
+    cancelSearch();
     onChange(null);
     onPhotoConsentChange(false);
     setQuery('');
