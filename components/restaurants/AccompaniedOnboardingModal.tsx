@@ -15,6 +15,8 @@ import {
 } from '@/lib/actions/invitations';
 import { useToast } from '@/components/shared/Toaster';
 import { buildQrMatrix, qrSvg } from '@/lib/links/qrCode';
+import type { InvitationPrefillRequest, TwentyCompany } from '@/lib/utils/twentyPrefill';
+import { InvitationPrefillSummary, TwentyCompanyPicker } from './TwentyCompanyPicker';
 
 type Invitation = Extract<InviteRestaurantOwnerResult, { ok: true }>;
 
@@ -64,6 +66,10 @@ export function AccompaniedOnboardingModal({ onClose, initialEmail, onInvited }:
   // Fonction du serveur pas à jour : pas de nouvel essai depuis cette fenêtre (chaque essai
   // créerait une nouvelle invitation classique).
   const [outdated, setOutdated] = useState(false);
+  // Fiche Twenty facultative (SIREN et photo préremplis) ; photo seulement avec l'accord.
+  const [company, setCompany] = useState<TwentyCompany | null>(null);
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const [prefillRequested, setPrefillRequested] = useState(false);
   const toast = useToast();
 
   const qr = useMemo(() => (invitation ? invitationQrDataUrl(invitation.onboardingUrl) : null), [invitation]);
@@ -73,7 +79,13 @@ export function AccompaniedOnboardingModal({ onClose, initialEmail, onInvited }:
     setError('');
     setIsPending(true);
     try {
-      const result = await inviteRestaurantOwnerAction(email.trim(), 'accompanied');
+      const prefill: InvitationPrefillRequest | undefined = company
+        ? { twentyCompanyId: company.id, photoConsent: company.photoValidated && photoConsent }
+        : undefined;
+      const result = prefill
+        ? await inviteRestaurantOwnerAction(email.trim(), 'accompanied', prefill)
+        : await inviteRestaurantOwnerAction(email.trim(), 'accompanied');
+      setPrefillRequested(!!prefill);
       if (result.ok) {
         onInvited?.();
         if (result.auditLogged === false) {
@@ -176,6 +188,8 @@ export function AccompaniedOnboardingModal({ onClose, initialEmail, onInvited }:
               </p>
             </div>
 
+            <InvitationPrefillSummary prefill={invitation.prefill} requested={prefillRequested} />
+
             <button
               onClick={onClose}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors"
@@ -204,6 +218,14 @@ export function AccompaniedOnboardingModal({ onClose, initialEmail, onInvited }:
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] read-only:bg-gray-50 read-only:text-gray-600"
+            />
+
+            <TwentyCompanyPicker
+              value={company}
+              onChange={setCompany}
+              photoConsent={photoConsent}
+              onPhotoConsentChange={setPhotoConsent}
+              disabled={isPending}
             />
 
             {error && (
