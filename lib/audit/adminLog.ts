@@ -7,7 +7,8 @@ import { getAdminClient } from '@/lib/supabase/server';
 import { ADMIN_LOG_FAILED_MESSAGE } from '@/lib/audit/messages';
 
 // link : liens courts et QR codes (P10), réglages des stores compris (target_id 'short_link_settings').
-export type AdminTargetType = 'user' | 'restaurant' | 'kbis' | 'config' | 'link';
+// access_request : demandes d'ouverture d'un espace restaurant (target_id : id de la demande).
+export type AdminTargetType = 'user' | 'restaurant' | 'kbis' | 'config' | 'link' | 'access_request';
 
 export interface AdminLogEntry {
   action: string;

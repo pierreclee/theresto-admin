@@ -35,6 +35,16 @@ export interface Restaurant {
   siren?: string | null;
   company_name_from_inpi?: string | null;
   kbis_path?: string | null;
+  /**
+   * Parcours accompagné sans Kbis : à déposer par le propriétaire depuis le Hub (remis à
+   * faux au dépôt). Écrit par le serveur seulement (docs/features/onboarding-accompagne.md).
+   */
+  kbis_required_later?: boolean | null;
+  /** Date du dépôt du Kbis enregistré ; NULL pour un Kbis d'avant cette colonne. */
+  kbis_submitted_at?: string | null;
+  /** Dates de la validation et du refus par l'admin (admin-onboarding). */
+  approval_approved_at?: string | null;
+  approval_rejected_at?: string | null;
   approval_status: 'pending' | 'pending_admin_review' | 'approved' | 'rejected' | 'suspended';
   /** 'free' peut encore être lu sur des lignes héritées ; il compte comme Essentiel. */
   subscription_plan: SubscriptionPlanKey | 'free';

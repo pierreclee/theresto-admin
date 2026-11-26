@@ -76,6 +76,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   approve_restaurant: 'Restaurant approuvé',
   reject_restaurant: 'Restaurant refusé',
   create_restaurant_invitation: 'Invitation envoyée',
+  list_restaurant_access_requests: 'Demandes d’espace restaurant consultées',
+  decline_restaurant_access_request: 'Demande d’espace restaurant refusée',
   subscription_plan_changed: 'Formule modifiée',
   update_platform_config: 'Configuration modifiée',
   update_subscription_price: 'Prix d’abonnement modifié',
@@ -136,6 +138,7 @@ export const AUDIT_RESOURCE_LABELS: Record<string, string> = {
   ontime_report: 'Signalement OnTime',
   ontime_sanction: 'Sanction OnTime',
   platform_settings: 'Réglages de la plateforme',
+  access_request: 'Demande d’espace restaurant',
 };
 
 function toOptions(labels: Record<string, string>): { value: string; label: string }[] {

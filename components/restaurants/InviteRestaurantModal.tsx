@@ -14,9 +14,11 @@ interface Props {
   onClose: () => void;
   /** Pre-filled and locked (e.g. when opened from a user's detail panel). */
   initialEmail?: string;
+  /** Appelé dès que l'invitation a été créée. */
+  onInvited?: () => void;
 }
 
-export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
+export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Props) {
   const [email, setEmail] = useState(initialEmail ?? '');
   const [error, setError] = useState('');
   const [isPending, setIsPending] = useState(false);
@@ -32,6 +34,7 @@ export function InviteRestaurantModal({ onClose, initialEmail }: Props) {
       const result = await inviteRestaurantOwnerAction(email.trim());
       if (result.ok) {
         setInvitation(result);
+        onInvited?.();
         if (result.auditLogged === false) {
           toast("Invitation envoyée, mais elle n'a pas pu être journalisée. Prévenez l'équipe technique.", 'error');
         }
