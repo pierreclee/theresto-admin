@@ -112,6 +112,15 @@ it('photo validée : lien « Voir la photo » sans image, case non cochée par d
   expect(latest.consent).toBe(true);
 });
 
+it('photo validée sans lien https : ni lien ni case (accord impossible sans voir la photo)', async () => {
+  search.mockResolvedValue({ ok: true, companies: [{ ...hygge, photoUrl: null }] });
+  render(<Harness />);
+  await typeAndWait('Hyg');
+  fireEvent.click((await screen.findAllByRole('option'))[0]);
+  expect(screen.queryByRole('link', { name: /Voir la photo/ })).toBeNull();
+  expect(screen.queryByRole('checkbox')).toBeNull();
+});
+
 it('photo non validée : ni lien ni case', async () => {
   search.mockResolvedValue({ ok: true, companies: [bistro] });
   render(<Harness />);

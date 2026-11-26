@@ -135,7 +135,7 @@ describe('préremplissage depuis Twenty', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Créer le lien' }));
     await waitFor(() => expect(screen.getByLabelText('Lien d’inscription')).toBeTruthy());
     expect(inviteRestaurantOwnerAction).toHaveBeenCalledWith('a@test.com', 'accompanied', {
-      twentyCompanyId: 'c1', photoConsent: true,
+      twentyCompanyId: 'c1', photoConsent: true, photoUrl: hygge.photoUrl,
     });
     const summary = screen.getByRole('list', { name: 'Préremplissage' });
     expect(summary.textContent).toContain('SIREN prérempli');

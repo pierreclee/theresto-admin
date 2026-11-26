@@ -157,20 +157,19 @@ export function TwentyCompanyPicker({ value, onChange, photoConsent, onPhotoCons
           </button>
         </div>
 
-        {value.photoValidated && (
+        {/* Accord seulement pour une photo que l'admin peut voir (lien https), dont l'URL part avec lui. */}
+        {value.photoValidated && value.photoUrl && (
           <div className="space-y-2">
-            {value.photoUrl && (
-              <a
-                href={value.photoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 text-xs font-medium text-[#FF6B35] hover:underline"
-              >
-                <ExternalLink size={12} />
-                Voir la photo
-                {value.photoLabel && <span className="font-normal text-gray-500"> ({value.photoLabel})</span>}
-              </a>
-            )}
+            <a
+              href={value.photoUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-xs font-medium text-[#FF6B35] hover:underline"
+            >
+              <ExternalLink size={12} />
+              Voir la photo
+              {value.photoLabel && <span className="font-normal text-gray-500"> ({value.photoLabel})</span>}
+            </a>
             <div className="flex items-start gap-2">
               <input
                 id={consentId}

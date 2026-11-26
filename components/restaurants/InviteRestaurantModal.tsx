@@ -38,7 +38,9 @@ export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Prop
     setIsPending(true);
     try {
       const prefill: InvitationPrefillRequest | undefined = company
-        ? { twentyCompanyId: company.id, photoConsent: company.photoValidated && photoConsent }
+        ? company.photoValidated && company.photoUrl && photoConsent
+          ? { twentyCompanyId: company.id, photoConsent: true, photoUrl: company.photoUrl }
+          : { twentyCompanyId: company.id, photoConsent: false }
         : undefined;
       const result = prefill
         ? await inviteRestaurantOwnerAction(email.trim(), 'email', prefill)

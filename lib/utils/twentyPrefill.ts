@@ -21,17 +21,24 @@ export interface InvitationPrefillRequest {
   twentyCompanyId: string;
   /** Le restaurateur accepte que TheResto utilise la photo (case, non cochée par défaut). */
   photoConsent: boolean;
+  /**
+   * URL de la photo montrée à l'admin (« Voir la photo », reçue de la recherche), envoyée
+   * seulement avec l'accord : la fonction refuse ('changed') une photo changée depuis.
+   */
+  photoUrl?: string | null;
 }
 
 export const PREFILL_PHOTO_OUTCOMES = [
-  'ok', 'none', 'no-consent', 'refused-host', 'failed', 'too-small', 'too-large', 'bad-type',
+  'ok', 'none', 'no-consent', 'refused-host', 'failed', 'too-small', 'too-large', 'bad-type', 'changed',
 ] as const;
 export type PrefillPhotoOutcome = (typeof PREFILL_PHOTO_OUTCOMES)[number];
+/** Raison que cette version de l'admin ne connaît pas (fonction plus récente). */
+export type PrefillPhotoResult = PrefillPhotoOutcome | 'unknown';
 
 /** Résultat du préremplissage renvoyé par la fonction (null : invitation sans fiche). */
 export interface InvitationPrefillResult {
   siren: boolean;
-  photo: PrefillPhotoOutcome;
+  photo: PrefillPhotoResult;
 }
 
 export const TWENTY_QUERY_MIN = 2;
@@ -105,11 +112,11 @@ export function parsePrefillResult(v: unknown): InvitationPrefillResult | null {
   if (!p || typeof p !== 'object') return null;
   const photo = (PREFILL_PHOTO_OUTCOMES as readonly string[]).includes(p.photo as string)
     ? (p.photo as PrefillPhotoOutcome)
-    : 'failed';
+    : 'unknown';
   return { siren: p.siren === true, photo };
 }
 
-const PHOTO_MESSAGES: Record<PrefillPhotoOutcome, string> = {
+const PHOTO_MESSAGES: Record<PrefillPhotoResult, string> = {
   ok: 'Photo préremplie',
   none: 'Photo non préremplie : aucune photo validée dans Twenty',
   'no-consent': 'Photo non préremplie : le restaurateur n’a pas donné son accord',
@@ -118,6 +125,10 @@ const PHOTO_MESSAGES: Record<PrefillPhotoOutcome, string> = {
   'too-small': 'Photo non préremplie : image trop petite (800 × 600 minimum)',
   'too-large': 'Photo non préremplie : image trop lourde (5 Mo maximum)',
   'bad-type': 'Photo non préremplie : format non reconnu (JPEG, PNG ou WebP attendu)',
+  changed:
+    'La photo a changé dans Twenty depuis votre vérification : elle n’a pas été reprise. '
+    + 'Revoyez-la puis recréez le lien.',
+  unknown: 'Photo non préremplie (raison inconnue)',
 };
 
 export interface PrefillLine {
@@ -131,7 +142,7 @@ export function prefillLines(prefill: InvitationPrefillResult): PrefillLine[] {
     prefill.siren
       ? { ok: true, text: 'SIREN prérempli' }
       : { ok: false, text: 'SIREN non prérempli : pas de SIREN validé dans Twenty' },
-    { ok: prefill.photo === 'ok', text: PHOTO_MESSAGES[prefill.photo] },
+    { ok: prefill.photo === 'ok', text: PHOTO_MESSAGES[prefill.photo] ?? PHOTO_MESSAGES.unknown },
   ];
 }
 

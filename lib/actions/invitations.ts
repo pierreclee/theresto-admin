@@ -87,10 +87,14 @@ export async function inviteRestaurantOwnerAction(
     email,
     mode: mode === 'accompanied' ? 'accompanied' : 'email',
   };
-  // Sans fiche : corps inchangé (ni twentyCompanyId ni photoConsent).
+  // Sans fiche : corps inchangé (ni twentyCompanyId ni photoConsent). L'URL de la photo vue
+  // par l'admin part seulement avec l'accord ; sans elle, pas d'accord (rien à comparer).
   if (prefill?.twentyCompanyId) {
+    const photoUrl = typeof prefill.photoUrl === 'string' && prefill.photoUrl !== '' ? prefill.photoUrl : null;
+    const photoConsent = prefill.photoConsent === true && photoUrl !== null;
     body.twentyCompanyId = prefill.twentyCompanyId;
-    body.photoConsent = prefill.photoConsent === true;
+    body.photoConsent = photoConsent;
+    if (photoConsent) body.photoUrl = photoUrl;
   }
 
   // User-session client: the admin's JWT is forwarded to the Edge Function,

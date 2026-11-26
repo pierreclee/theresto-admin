@@ -28,6 +28,7 @@ import {
 } from '@/lib/utils/twentyPrefill';
 
 const COMPANY_ID = '0b9a4c8e-3f1d-4a2b-9c7e-5d6f7a8b9c0d';
+const PHOTO_URL = 'https://lh3.googleusercontent.com/p/x';
 const invitation = {
   email: 'a@test.com', onboardingUrl: 'https://hub/onboarding/t', expiresAt: '2026-12-01T00:00:00Z',
   hasAccount: true, emailSent: true, mode: 'email', auditLogged: true,
@@ -53,24 +54,49 @@ describe('inviteRestaurantOwnerAction', () => {
     expect(result).toEqual({ ok: true, ...invitation, prefill: null });
   });
 
-  it('avec fiche : identifiant et accord photo transmis tels quels', async () => {
+  it('avec fiche et accord : identifiant, accord et URL de la photo vue transmis', async () => {
     invoke.mockResolvedValue({ data: { data: { ...invitation, prefill: { siren: true, photo: 'ok' } } }, error: null });
-    const result = await inviteRestaurantOwnerAction('a@test.com', 'email', { twentyCompanyId: COMPANY_ID, photoConsent: true });
+    const result = await inviteRestaurantOwnerAction('a@test.com', 'email', {
+      twentyCompanyId: COMPANY_ID, photoConsent: true, photoUrl: PHOTO_URL,
+    });
     expect(invoke).toHaveBeenCalledWith('admin-onboarding', {
       body: {
         action: 'createRestaurantInvitation', email: 'a@test.com', mode: 'email',
-        twentyCompanyId: COMPANY_ID, photoConsent: true,
+        twentyCompanyId: COMPANY_ID, photoConsent: true, photoUrl: PHOTO_URL,
       },
     });
     expect(result.ok && result.prefill).toEqual({ siren: true, photo: 'ok' });
   });
 
+  it('avec fiche sans accord : pas d URL de photo, même si elle est fournie', async () => {
+    invoke.mockResolvedValue({ data: { data: { ...invitation, prefill: { siren: true, photo: 'no-consent' } } }, error: null });
+    await inviteRestaurantOwnerAction('a@test.com', 'accompanied', {
+      twentyCompanyId: COMPANY_ID, photoConsent: false, photoUrl: PHOTO_URL,
+    });
+    expect(invoke).toHaveBeenCalledWith('admin-onboarding', {
+      body: {
+        action: 'createRestaurantInvitation', email: 'a@test.com', mode: 'accompanied',
+        twentyCompanyId: COMPANY_ID, photoConsent: false,
+      },
+    });
+  });
+
+  it('accord sans URL de photo : accord retiré (rien à comparer)', async () => {
+    invoke.mockResolvedValue({ data: { data: invitation }, error: null });
+    await inviteRestaurantOwnerAction('a@test.com', 'email', { twentyCompanyId: COMPANY_ID, photoConsent: true });
+    expect(invoke.mock.calls[0][1].body).toEqual({
+      action: 'createRestaurantInvitation', email: 'a@test.com', mode: 'email',
+      twentyCompanyId: COMPANY_ID, photoConsent: false,
+    });
+  });
+
   it('accord photo non booléen : false', async () => {
     invoke.mockResolvedValue({ data: { data: { ...invitation, prefill: { siren: false, photo: 'no-consent' } } }, error: null });
     await inviteRestaurantOwnerAction('a@test.com', 'email', {
-      twentyCompanyId: COMPANY_ID, photoConsent: 'yes' as unknown as boolean,
+      twentyCompanyId: COMPANY_ID, photoConsent: 'yes' as unknown as boolean, photoUrl: PHOTO_URL,
     });
     expect(invoke.mock.calls[0][1].body.photoConsent).toBe(false);
+    expect(invoke.mock.calls[0][1].body).not.toHaveProperty('photoUrl');
   });
 
   it('mode inconnu : email', async () => {
@@ -184,7 +210,8 @@ describe('résultat du préremplissage', () => {
   it('lecture défensive', () => {
     expect(parsePrefillResult(null)).toBeNull();
     expect(parsePrefillResult(undefined)).toBeNull();
-    expect(parsePrefillResult({ siren: 'oui', photo: 'inconnu' })).toEqual({ siren: false, photo: 'failed' });
+    expect(parsePrefillResult({ siren: 'oui', photo: 'inconnu' })).toEqual({ siren: false, photo: 'unknown' });
+    expect(parsePrefillResult({ siren: true, photo: 'changed' })).toEqual({ siren: true, photo: 'changed' });
   });
 
   it('une ligne pour le SIREN et une pour la photo, chaque issue traduite', () => {
@@ -194,7 +221,18 @@ describe('résultat du préremplissage', () => {
     ]);
     const texts = PREFILL_PHOTO_OUTCOMES.map((photo) => prefillLines({ siren: false, photo })[1].text);
     expect(new Set(texts).size).toBe(PREFILL_PHOTO_OUTCOMES.length);
-    for (const text of texts.slice(1)) expect(text).toMatch(/^Photo non préremplie : /);
+    PREFILL_PHOTO_OUTCOMES.forEach((outcome, i) => {
+      if (outcome !== 'ok' && outcome !== 'changed') expect(texts[i]).toMatch(/^Photo non préremplie : /);
+    });
+    expect(prefillLines({ siren: true, photo: 'changed' })[1]).toEqual({
+      ok: false,
+      text: 'La photo a changé dans Twenty depuis votre vérification : elle n’a pas été reprise. '
+        + 'Revoyez-la puis recréez le lien.',
+    });
+    expect(prefillLines({ siren: true, photo: 'unknown' })[1].text).toBe('Photo non préremplie (raison inconnue)');
+    // Valeur hors type (réponse non relue) : libellé générique, jamais undefined.
+    expect(prefillLines({ siren: true, photo: 'autre' as never })[1].text)
+      .toBe('Photo non préremplie (raison inconnue)');
     expect(prefillLines({ siren: false, photo: 'none' })[0]).toEqual({
       ok: false, text: expect.stringMatching(/^SIREN non prérempli/),
     });
