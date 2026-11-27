@@ -42,6 +42,9 @@ const EXEMPT: Record<string, string> = {
   // invitations.ts
   inviteRestaurantOwnerAction:
     'journalisée par l Edge Function admin-onboarding (create_restaurant_invitation), auditLogged renvoyé',
+  searchTwentyCompaniesAction:
+    'journalisée par l Edge Function admin-onboarding (search_twenty_companies, nombre de résultats seulement), '
+    + 'recherche refusée (503) si le journal échoue',
   // ontime.ts : les RPC admin_* écrivent elles-mêmes platform_logs, dans la même transaction
   // que la lecture ou la décision (contrat docs/features/ontime-tracking.md §4)
   listOntimeReportsAction: 'journalisée par la RPC admin_ontime_reports (ontime_reports_viewed), même transaction',

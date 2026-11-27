@@ -7,6 +7,8 @@ import {
   type InviteRestaurantOwnerResult,
 } from '@/lib/actions/invitations';
 import { useToast } from '@/components/shared/Toaster';
+import type { InvitationPrefillRequest, TwentyCompany } from '@/lib/utils/twentyPrefill';
+import { InvitationPrefillSummary, TwentyCompanyPicker } from './TwentyCompanyPicker';
 
 type Invitation = Extract<InviteRestaurantOwnerResult, { ok: true }>;
 
@@ -24,6 +26,10 @@ export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Prop
   const [isPending, setIsPending] = useState(false);
   const [invitation, setInvitation] = useState<Invitation | null>(null);
   const [copied, setCopied] = useState(false);
+  // Fiche Twenty facultative (SIREN et photo préremplis) ; photo seulement avec l'accord.
+  const [company, setCompany] = useState<TwentyCompany | null>(null);
+  const [photoConsent, setPhotoConsent] = useState(false);
+  const [prefillRequested, setPrefillRequested] = useState(false);
   const toast = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -31,7 +37,15 @@ export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Prop
     setError('');
     setIsPending(true);
     try {
-      const result = await inviteRestaurantOwnerAction(email.trim());
+      const prefill: InvitationPrefillRequest | undefined = company
+        ? company.photoValidated && company.photoUrl && photoConsent
+          ? { twentyCompanyId: company.id, photoConsent: true, photoUrl: company.photoUrl }
+          : { twentyCompanyId: company.id, photoConsent: false }
+        : undefined;
+      const result = prefill
+        ? await inviteRestaurantOwnerAction(email.trim(), 'email', prefill)
+        : await inviteRestaurantOwnerAction(email.trim());
+      setPrefillRequested(!!prefill);
       if (result.ok) {
         setInvitation(result);
         onInvited?.();
@@ -108,6 +122,8 @@ export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Prop
               </p>
             </div>
 
+            <InvitationPrefillSummary prefill={invitation.prefill} requested={prefillRequested} />
+
             <button
               onClick={onClose}
               className="w-full px-4 py-2 text-sm font-medium text-white bg-gray-800 hover:bg-gray-900 rounded-xl transition-colors"
@@ -133,8 +149,16 @@ export function InviteRestaurantModal({ onClose, initialEmail, onInvited }: Prop
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF6B35]/30 focus:border-[#FF6B35] read-only:bg-gray-50 read-only:text-gray-600"
             />
 
+            <TwentyCompanyPicker
+              value={company}
+              onChange={setCompany}
+              photoConsent={photoConsent}
+              onPhotoConsentChange={setPhotoConsent}
+              disabled={isPending}
+            />
+
             {error && (
-              <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+              <p role="alert" className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
                 {error}
               </p>
             )}

@@ -5,9 +5,12 @@ import {
   AccompaniedOnboardingModal,
   invitationQrDataUrl,
 } from '@/components/restaurants/AccompaniedOnboardingModal';
-import { inviteRestaurantOwnerAction } from '@/lib/actions/invitations';
+import { inviteRestaurantOwnerAction, searchTwentyCompaniesAction } from '@/lib/actions/invitations';
 
-jest.mock('@/lib/actions/invitations', () => ({ inviteRestaurantOwnerAction: jest.fn() }));
+jest.mock('@/lib/actions/invitations', () => ({
+  inviteRestaurantOwnerAction: jest.fn(),
+  searchTwentyCompaniesAction: jest.fn(),
+}));
 // Matrice et dessin du QR : lib/links/qrCode.ts, testés par qrCode.test.ts et qrReadability.test.ts.
 const buildQrMatrix = jest.fn((text: string) => ({ text }));
 jest.mock('@/lib/links/qrCode', () => ({
@@ -108,4 +111,53 @@ it('adresse préremplie : verrouillée, envoyée telle quelle, onInvited appelé
   await waitFor(() => expect(screen.getByLabelText('Lien d’inscription')).toBeTruthy());
   expect(inviteRestaurantOwnerAction).toHaveBeenCalledWith('a@test.com', 'accompanied');
   expect(onInvited).toHaveBeenCalledTimes(1);
+});
+
+// Fiche Twenty facultative : choisie dans le sélecteur, transmise avec l'accord photo,
+// résultat du préremplissage affiché après la création.
+const hygge = {
+  id: 'c1', name: 'Hygge', city: 'Rouen', sirenValidated: true, photoValidated: true,
+  photoLabel: 'Google Maps', photoUrl: 'https://lh3.googleusercontent.com/p/x',
+};
+
+async function pickHygge(consent: boolean) {
+  (searchTwentyCompaniesAction as jest.Mock).mockResolvedValue({ ok: true, companies: [hygge] });
+  fireEvent.change(screen.getByLabelText('Fiche Twenty (facultatif)'), { target: { value: 'Hyg' } });
+  fireEvent.click((await screen.findAllByRole('option'))[0]);
+  if (consent) fireEvent.click(screen.getByLabelText(/Le restaurateur accepte/));
+}
+
+describe('préremplissage depuis Twenty', () => {
+  it('fiche et accord transmis, résultat affiché', async () => {
+    (inviteRestaurantOwnerAction as jest.Mock).mockResolvedValue({ ...invitation, prefill: { siren: true, photo: 'ok' } });
+    render(<AccompaniedOnboardingModal onClose={jest.fn()} initialEmail="a@test.com" />);
+    await pickHygge(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Créer le lien' }));
+    await waitFor(() => expect(screen.getByLabelText('Lien d’inscription')).toBeTruthy());
+    expect(inviteRestaurantOwnerAction).toHaveBeenCalledWith('a@test.com', 'accompanied', {
+      twentyCompanyId: 'c1', photoConsent: true, photoUrl: hygge.photoUrl,
+    });
+    const summary = screen.getByRole('list', { name: 'Préremplissage' });
+    expect(summary.textContent).toContain('SIREN prérempli');
+    expect(summary.textContent).toContain('Photo préremplie');
+  });
+
+  it('case non cochée : photoConsent false, raison affichée', async () => {
+    (inviteRestaurantOwnerAction as jest.Mock).mockResolvedValue({ ...invitation, prefill: { siren: false, photo: 'no-consent' } });
+    render(<AccompaniedOnboardingModal onClose={jest.fn()} initialEmail="a@test.com" />);
+    await pickHygge(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Créer le lien' }));
+    await waitFor(() => expect(screen.getByLabelText('Lien d’inscription')).toBeTruthy());
+    expect(inviteRestaurantOwnerAction).toHaveBeenCalledWith('a@test.com', 'accompanied', {
+      twentyCompanyId: 'c1', photoConsent: false,
+    });
+    expect(screen.getByText('Photo non préremplie : le restaurateur n’a pas donné son accord')).toBeTruthy();
+  });
+
+  it('sans fiche : aucun résultat de préremplissage affiché', async () => {
+    (inviteRestaurantOwnerAction as jest.Mock).mockResolvedValue({ ...invitation, prefill: null });
+    await launch();
+    expect(screen.queryByRole('list', { name: 'Préremplissage' })).toBeNull();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
 });
